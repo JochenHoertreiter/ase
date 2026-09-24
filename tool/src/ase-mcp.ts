@@ -14,6 +14,7 @@ import { StreamableHTTPClientTransport } from "@modelcontextprotocol/sdk/client/
 import type { JSONRPCMessage }           from "@modelcontextprotocol/sdk/types.js"
 
 import type Log                 from "./ase-log.js"
+import { debugLog, debugLogEnv } from "./ase-debuglog.js"
 import { SERVICE_HOST as HOST, probe, loadServiceContext } from "./ase-service.js"
 
 /*  CLI command "ase mcp"  */
@@ -32,11 +33,14 @@ export default class MCPCommand {
         /*  fast path: already running  */
         if (ctx.port !== null) {
             const match = await probe(ctx.port, ctx.projectId).catch(() => null)
-            if (match === true)
+            if (match === true) {
+                debugLog("MCP", `ensureService: already running on port ${ctx.port}`)
                 return { projectId: ctx.projectId, port: ctx.port }
+            }
         }
 
         /*  spawn "ase service start" using the same node entry point  */
+        debugLog("MCP", "ensureService: spawning \"ase service start\"")
         const entry = fileURLToPath(new URL("./ase.js", import.meta.url))
         await execa(process.execPath, [ entry, "service", "start" ], {
             stdio:    "ignore",
@@ -50,6 +54,7 @@ export default class MCPCommand {
         const match = await probe(ctx.port, ctx.projectId)
         if (match !== true)
             throw new Error(`mcp: service not responding on port ${ctx.port} after start`)
+        debugLog("MCP", `ensureService: started on port ${ctx.port}`)
         return { projectId: ctx.projectId, port: ctx.port }
     }
 
@@ -60,8 +65,12 @@ export default class MCPCommand {
 
     /*  bridge stdio to a Streamable HTTP MCP endpoint on the local service  */
     private async runBridge (): Promise<void> {
+        debugLog("MCP", "runBridge: enter")
+        debugLogEnv("MCP")
+
         /*  ensure the service is running  */
         let { projectId, port } = await this.ensureService()
+        debugLog("MCP", `runBridge: service ready (projectId=${projectId}, port=${port})`)
 
         /*  create MCP STDIO server (lives for the entire bridge lifetime)  */
         const server = new StdioServerTransport()
@@ -82,6 +91,7 @@ export default class MCPCommand {
         const shutdown = async () => {
             if (bridgeDone)
                 return
+            debugLog("MCP", "shutdown: enter")
             bridgeDone = true
             if (client !== null)
                 closedByUs.add(client)
@@ -90,11 +100,13 @@ export default class MCPCommand {
                 Promise.allSettled([ server.close(), client?.close() ]),
                 timeout
             ])
+            debugLog("MCP", "shutdown: leave (exiting process)")
             process.exit(0)
         }
 
         /*  (re-)connect the HTTP client to the service  */
         const connectClient = async () => {
+            debugLog("MCP", `connectClient: connecting to http://${HOST}:${port}/mcp`)
             const url    = new URL(`http://${HOST}:${port}/mcp`)
             const next   = new StreamableHTTPClientTransport(url)
 
@@ -117,12 +129,14 @@ export default class MCPCommand {
             /*  activate the connection and flush buffered messages  */
             await next.start()
             client = next
+            debugLog("MCP", `connectClient: connected (pending=${pending.length})`)
             for (const msg of pending.splice(0, pending.length))
                 sendToClient(msg)
         }
 
         /*  reconnect loop: restart service if needed, then reconnect client  */
         const reconnect = async (attempt = 0) => {
+            debugLog("MCP", `reconnect: attempt=${attempt}`)
             const delay = Math.min(500 * 2 ** attempt, 10000)
             await new Promise<void>((resolve) => setTimeout(resolve, delay))
             if (bridgeDone) {
@@ -154,6 +168,7 @@ export default class MCPCommand {
             if (reconnecting)
                 return
             reconnecting = true
+            debugLog("MCP", `triggerReconnect: ${reason}`)
             this.log.write("warning", `mcp: ${reason} — reconnecting`)
             reconnect(0).catch(() => {})
         }
@@ -167,6 +182,7 @@ export default class MCPCommand {
         const sendToClient = (msg: JSONRPCMessage) => {
             if (client === null) {
                 if (pending.length >= MAX_PENDING) {
+                    debugLog("MCP", "sendToClient: pending queue overflow, dropping oldest message")
                     this.log.write("warning", "mcp: pending queue overflow, dropping oldest message")
                     pending.shift()
                 }
@@ -189,6 +205,7 @@ export default class MCPCommand {
 
         /*  start server and initial client  */
         await server.start()
+        debugLog("MCP", "runBridge: stdio server started")
         try {
             await connectClient()
         }
@@ -209,6 +226,7 @@ export default class MCPCommand {
             }
             catch (err: unknown) {
                 /*  ignore transient probe errors but record them  */
+                debugLog("MCP", `healthCheck: error: ${this.asError(err).message}`)
                 this.log.write("debug", `mcp: health check error: ${this.asError(err).message}`)
             }
         }, HEALTH_INTERVAL_MS)

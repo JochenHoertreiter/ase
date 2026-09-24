@@ -26,6 +26,7 @@ import { Config, configSchema, ConfigMCP } from "./ase-config.js"
 import type Log                          from "./ase-log.js"
 import { isLogLevel }                    from "./ase-log.js"
 import type { LogLevel }                 from "./ase-log.js"
+import { debugLog }                      from "./ase-debuglog.js"
 import { CompatMCP }                     from "./ase-compat.js"
 import { DiagramMCP }                    from "./ase-diagram.js"
 import { TaskMCP }                       from "./ase-task.js"
@@ -67,14 +68,22 @@ export const probe = async (port: number, projectId: string): Promise<boolean | 
             signal:              AbortSignal.timeout(2000),
             ignoreResponseError: true
         })
-        if (r.status < 200 || r.status >= 300)
+        if (r.status < 200 || r.status >= 300) {
+            debugLog("SERVICE", `probe: port=${port}, projectId=${projectId}, result=false (status ${r.status})`)
             return false
-        const d = r._data as { ase?: boolean, projectId?: string } | null
-        return d?.ase === true && d?.projectId === projectId
+        }
+        const d      = r._data as { ase?: boolean, projectId?: string } | null
+        const result = d?.ase === true && d?.projectId === projectId
+        debugLog("SERVICE", `probe: port=${port}, projectId=${projectId}, result=${result}`)
+        return result
     }
     catch (err: unknown) {
-        if (isConnRefused(err))
+        if (isConnRefused(err)) {
+            debugLog("SERVICE", `probe: port=${port}, projectId=${projectId}, result=null (connection refused)`)
             return null
+        }
+        const message = err instanceof Error ? err.message : String(err)
+        debugLog("SERVICE", `probe: port=${port}, projectId=${projectId}, error=${message}`)
         throw err
     }
 }
@@ -121,6 +130,7 @@ export const loadServiceContext = (log: Log): Context => {
     const aseDir    = path.dirname(svc.filename)
 
     /*  return context information  */
+    debugLog("SERVICE", `loadServiceContext: projectId=${projectId}, port=${port}, aseDir=${aseDir}`)
     return { projectId, port, svc, aseDir }
 }
 
@@ -144,14 +154,17 @@ export class Service {
     static async allocatePort (): Promise<number> {
         for (let i = 0; i < PORT_TRIES; i++) {
             const p = PORT_MIN + Math.floor(Math.random() * (PORT_MAX - PORT_MIN + 1))
-            if (await Service.tryBind(p))
+            if (await Service.tryBind(p)) {
+                debugLog("SERVICE", `allocatePort: allocated port ${p}`)
                 return p
+            }
         }
         throw new Error(`failed to allocate a port in ${PORT_MIN}..${PORT_MAX} after ${PORT_TRIES} attempts`)
     }
 
     /*  persist an allocated port into ".ase/service.yaml"  */
     static persistPort (svc: Config, port: number): void {
+        debugLog("SERVICE", `persistPort: port=${port}`)
         svc.lock(() => {
             svc.read()
             svc.set("port", port)
@@ -161,6 +174,7 @@ export class Service {
 
     /*  clear the persisted port and remove ".ase/service.yaml" if it is empty  */
     static clearPort (svc: Config): void {
+        debugLog("SERVICE", "clearPort: enter")
         svc.lock(() => {
             svc.read()
             svc.delete("port")
@@ -191,6 +205,7 @@ export class Service {
 
     /*  spawn the current executable detached as a background service  */
     static spawnDetached (aseDir: string, port: number, logLevel: LogLevel): { child: ChildProcess, logFile: string } {
+        debugLog("SERVICE", `spawnDetached: aseDir=${aseDir}, port=${port}, logLevel=${logLevel}`)
         fs.mkdirSync(aseDir, { recursive: true })
         const logFile = path.join(aseDir, "service.log")
 
@@ -207,6 +222,7 @@ export class Service {
             stdio:    [ "ignore", fd, fd ]
         })
         fs.closeSync(fd)
+        debugLog("SERVICE", `spawnDetached: spawned child pid=${child.pid ?? "unknown"}`)
         return { child, logFile }
     }
 
@@ -280,6 +296,8 @@ export default class ServiceCommand {
 
     /*  service-side: bind HAPI server until "/stop" command is received or idle timeout happens  */
     private async runService (ctx: Context & { port: number }): Promise<void> {
+        debugLog("SERVICE", `runService: enter (projectId=${ctx.projectId}, port=${ctx.port})`)
+
         /*  establish HAPI HTTP/REST service  */
         const server = Hapi.server({ host: HOST, port: ctx.port })
 
@@ -333,6 +351,7 @@ export default class ServiceCommand {
             method:  "GET",
             path:    "/stop",
             handler: (_request, h) => {
+                debugLog("SERVICE", "route /stop: stop requested")
                 this.log.write("info", "service: stop requested")
                 setImmediate(async () => {
                     try {
@@ -340,6 +359,7 @@ export default class ServiceCommand {
                     }
                     catch (err: unknown) {
                         const e = err as Error
+                        debugLog("SERVICE", `route /stop: stop failed: ${e.message}`)
                         this.log.write("error", `service: stop failed: ${e.message}`)
                     }
                     process.exit(0)
@@ -372,6 +392,17 @@ export default class ServiceCommand {
                 (session handshakes, notifications, SSE stream opens) at
                 debug level only, as it carries no diagnostic value  */
             const level = bMethod === "tools/call" ? "info" : "debug"
+            debugLog("SERVICE", `mcpHandler: ${request.method.toUpperCase()} ${request.path}${bodyInfo}`)
+
+            /*  the "initialize" request is the only place where the client
+                announces its protocol capabilities, most notably whether it
+                offers "roots" -- the mechanism through which a client tells a
+                server which directories it is supposed to operate on  */
+            if (bMethod === "initialize")
+                debugLog("SERVICE", "mcpHandler: initialize " +
+                    `clientInfo=${JSON.stringify(bParams?.clientInfo ?? null)}, ` +
+                    `capabilities=${JSON.stringify(bParams?.capabilities ?? null)}`)
+
             this.log.write(level, `mcp: ${request.method.toUpperCase()} ${request.path}${bodyInfo}`)
             const transport = new StreamableHTTPServerTransport({ sessionIdGenerator: undefined })
             const mcp       = buildMcpServer()
@@ -389,6 +420,7 @@ export default class ServiceCommand {
             }
             catch (err: unknown) {
                 const message = err instanceof Error ? err.message : String(err)
+                debugLog("SERVICE", `mcpHandler: error: ${message}`)
                 this.log.write("error", `mcp: ${message}`)
                 if (!request.raw.res.headersSent) {
                     request.raw.res.statusCode = 500
@@ -434,6 +466,7 @@ export default class ServiceCommand {
         try {
             await server.start()
             Service.persistPort(ctx.svc, ctx.port)
+            debugLog("SERVICE", `runService: listening on port ${ctx.port}`)
             this.log.write("info", `service: listening on port ${ctx.port}`)
         }
         catch (err: unknown) {
@@ -441,12 +474,16 @@ export default class ServiceCommand {
             if (e.code === "EADDRINUSE") {
                 /*  race-loser re-probe: another "ase service start" won the race  */
                 const match = await probe(ctx.port, ctx.projectId).catch(() => null)
-                if (match === true)
+                if (match === true) {
+                    debugLog("SERVICE", `runService: lost port ${ctx.port} race to another instance, exiting`)
                     process.exit(0)
+                }
+                debugLog("SERVICE", `runService: port ${ctx.port} in use, but not responding!`)
                 this.log.write("error", `service: port ${ctx.port} in use, but not responding!`)
                 Service.clearPort(ctx.svc)
                 process.exit(1)
             }
+            debugLog("SERVICE", `runService: start failed: ${e.message}`)
             this.log.write("error", `service: ${e.message}`)
             process.exit(1)
         }
@@ -459,6 +496,7 @@ export default class ServiceCommand {
                 return
             if (Date.now() - lastActivity > IDLE_MS) {
                 stopping = true
+                debugLog("SERVICE", "runService: idle timeout reached, stopping")
                 this.log.write("info", "service: idle timeout reached, stopping")
                 try {
                     await server.stop({ timeout: 1000 })
@@ -467,6 +505,7 @@ export default class ServiceCommand {
                 }
                 catch (err: unknown) {
                     const e = err as Error
+                    debugLog("SERVICE", `runService: idle stop failed: ${e.message}`)
                     this.log.write("error", `service: stop failed: ${e.message}`)
                     Service.clearPort(ctx.svc)
                     process.exit(1)
@@ -477,6 +516,7 @@ export default class ServiceCommand {
 
     /*  start flow: ensure port, probe, optionally detach  */
     private async doStart (): Promise<number> {
+        debugLog("SERVICE", "doStart: enter")
         const ctx = this.loadContext()
         let port = ctx.port
         if (process.env[SERVE_ENV] === "1") {
@@ -493,6 +533,7 @@ export default class ServiceCommand {
         if (port !== null) {
             const match = await probe(port, ctx.projectId).catch(() => null)
             if (match === true) {
+                debugLog("SERVICE", `doStart: already running on port ${port}`)
                 this.log.write("info", `service: already running on port ${port}`)
                 return 0
             }
@@ -524,6 +565,7 @@ export default class ServiceCommand {
                         break
                     const s = await probe(port, ctx.projectId).catch(() => null)
                     if (s === true) {
+                        debugLog("SERVICE", `doStart: started on port ${port}`)
                         this.log.write("info", `service: started on port ${port}`)
                         child.unref()
                         success = true
@@ -541,6 +583,7 @@ export default class ServiceCommand {
                         `service lost port ${port} race to a foreign listener` :
                         "service failed to start within timeout"
                 const detail = tail.length > 0 ? `\n---- ${logFile} (tail) ----\n${tail}` : ""
+                debugLog("SERVICE", `doStart: attempt failed: ${reason}`)
                 lastErr = new Error(`${reason}${detail}`)
             }
             finally {
@@ -580,6 +623,7 @@ export default class ServiceCommand {
 
     /*  status flow: report whether the service is running  */
     private async doStatus (): Promise<number> {
+        debugLog("SERVICE", "doStatus: enter")
         const ctx = this.loadContext()
         if (ctx.port === null) {
             process.stdout.write("service: not running (no port configured)\n")
@@ -605,6 +649,7 @@ export default class ServiceCommand {
 
     /*  send command: POST /command with the arbitrary cmd token  */
     private async doSend (cmd: string): Promise<number> {
+        debugLog("SERVICE", `doSend: enter (cmd=${cmd})`)
         let ctx = this.loadContext()
         if (ctx.port === null || await probe(ctx.port, ctx.projectId).catch(() => null) !== true) {
             /*  auto-start the service once, then re-check  */
@@ -626,6 +671,7 @@ export default class ServiceCommand {
 
     /*  log flow: show the (tail of the) log file and optionally follow it  */
     private async doLog (opts: { follow?: boolean, lines?: string }): Promise<number> {
+        debugLog("SERVICE", `doLog: enter (follow=${opts.follow ?? false}, lines=${opts.lines ?? ""})`)
         const ctx     = this.loadContext()
         const logFile = path.join(ctx.aseDir, "service.log")
         const lines   = opts.lines !== undefined ? Number(opts.lines) : null
@@ -657,6 +703,7 @@ export default class ServiceCommand {
 
     /*  stop flow: no-op if no port configured or connection refused  */
     private async doStop (): Promise<number> {
+        debugLog("SERVICE", "doStop: enter")
         const ctx = this.loadContext()
         if (ctx.port === null) {
             this.log.write("info", "service: not running (no port configured)")
@@ -678,6 +725,7 @@ export default class ServiceCommand {
             ignoreResponseError: true
         })
         const ok = r.status >= 200 && r.status < 300
+        debugLog("SERVICE", `doStop: stop request completed (ok=${ok})`)
         Service.clearPort(ctx.svc)
         return ok ? 0 : 1
     }
