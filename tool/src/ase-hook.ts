@@ -19,6 +19,7 @@ import { Config }                                         from "./ase-config-cor
 import { configSchema }                                   from "./ase-config-schema.js"
 import { parseScope, userStateDir }                       from "./ase-config-scope.js"
 import { readStdin, writeStdout }                         from "./ase-lib-stdio.js"
+import { debugLog, debugLogEnv }                          from "./ase-lib-debuglog.js"
 import { Task }                                           from "./ase-task.js"
 import * as TaskFormat                                    from "./ase-task-format.js"
 
@@ -150,6 +151,7 @@ export default class HookCommand {
                 if (fs.statSync(dir).mtimeMs >= deadline)
                     continue
                 fs.rmSync(dir, { recursive: true, force: true })
+                debugLog("HOOK", `pruneStaleSessions: pruned stale session directory ${dir}`)
                 this.log.write("debug", `hook: pruned stale session directory: ${dir}`)
             }
             catch (_e) {
@@ -311,6 +313,8 @@ export default class HookCommand {
 
     /*  handler for "ase hook session-start" (all tools)  */
     private async doSessionStart (tool: Tool): Promise<number> {
+        debugLog("HOOK", "doSessionStart: enter", tool)
+
         /*  determine plugin root (env var name differs per tool)  */
         const pluginRoot = this.pluginRoot(tool)
 
@@ -340,6 +344,8 @@ export default class HookCommand {
 
         /*  determine session id  */
         const sessionId = this.pickSessionId(input)
+        debugLog("HOOK", `doSessionStart: sessionId=${sessionId}, harnessCwd=${input.cwd ?? ""}`, tool)
+        debugLogEnv("HOOK", tool)
 
         /*  garbage-collect orphaned session directories of previous agent runs  */
         this.pruneStaleSessions(sessionId)
@@ -365,6 +371,7 @@ export default class HookCommand {
 
         /*  determine project id  */
         const projectId = this.determineProjectId(input.cwd ?? process.cwd(), cfg)
+        debugLog("HOOK", `doSessionStart: projectId=${projectId}, taskId=${taskId}`, tool)
 
         /*  determine user id  */
         const userId = process.env.USER ?? process.env.LOGNAME ?? "unknown"
@@ -398,6 +405,7 @@ export default class HookCommand {
             version: versionCurrentPlugin, versionHint, pluginRoot, persona, guidance, userId, projectId,
             boxing, lifecycle, specBasedir, specSchema, taskId, sessionId, headless
         }, md, path.dirname(fileMd), style)
+        debugLog("HOOK", "doSessionStart: leave (payload written to stdout)", tool)
         await writeStdout(JSON.stringify(payload))
         return 0
     }
@@ -515,32 +523,38 @@ export default class HookCommand {
     }
 
     /*  handler for "ase hook user-prompt-submit" (all tools)  */
-    private async doUserPromptSubmit (_tool: Tool): Promise<number> {
+    private async doUserPromptSubmit (tool: Tool): Promise<number> {
+        debugLog("HOOK", "doUserPromptSubmit: enter", tool)
         await this.drainStdin()
         this.writeAgentStatus("busy")
         return 0
     }
 
     /*  handler for "ase hook stop" (all tools)  */
-    private async doStop (_tool: Tool): Promise<number> {
+    private async doStop (tool: Tool): Promise<number> {
+        debugLog("HOOK", "doStop: enter", tool)
         await this.drainStdin()
         this.writeAgentStatus("ready")
         return 0
     }
 
     /*  handler for "ase hook session-end" (all tools)  */
-    private async doSessionEnd (_tool: Tool): Promise<number> {
+    private async doSessionEnd (tool: Tool): Promise<number> {
         /*  determine session id  */
         const sessionId = await this.readSessionIdFromStdin()
+        debugLog("HOOK", `doSessionEnd: enter, sessionId=${sessionId}`, tool)
 
         /*  remove the session directory <state-dir>/session/<id> (only for a valid sessionId)  */
         if (this.isValidSessionId(sessionId)) {
             const dir = path.join(this.sessionBaseDir(), sessionId)
             try {
                 fs.rmSync(dir, { recursive: true, force: true })
+                debugLog("HOOK", `doSessionEnd: removed session directory ${dir}`, tool)
             }
-            catch (_e) {
+            catch (err) {
                 /*  best-effort: ignore failures  */
+                const message = err instanceof Error ? err.message : String(err)
+                debugLog("HOOK", `doSessionEnd: failed to remove session directory ${dir}: ${message}`, tool)
             }
         }
         return 0
@@ -621,6 +635,7 @@ export default class HookCommand {
             if (result.success)
                 toolInput = result.output
         }
+        debugLog("HOOK", `decideApproval: toolName=${toolName}`, tool)
         const command = toolInput.command ?? ""
         if (toolName === spec.bashToolName && /^ase(\s|$)/.test(command)
             && !/[;&|<>`\n]|\$\(/.test(command))
@@ -649,8 +664,10 @@ export default class HookCommand {
         const stdin = await readStdin().catch(() => "")
         const input = this.parseJSON(stdin, v.looseObject({
             session_id: v.optional(v.string()),
-            sessionId:  v.optional(v.string())
+            sessionId:  v.optional(v.string()),
+            cwd:        v.optional(v.string())
         }))
+        debugLog("HOOK", `readHookInput: payloadCwd=${typeof input.cwd === "string" ? input.cwd : "(absent)"}`, tool)
         return { spec, input }
     }
 
@@ -663,15 +680,20 @@ export default class HookCommand {
         still drain stdin, as Codex treats a non-draining hook as a hard
         error.  */
     private async doPreToolUse (tool: Tool): Promise<number> {
+        debugLog("HOOK", "doPreToolUse: enter", tool)
+
         /*  read tool invocation information  */
         const { spec, input } = await this.readHookInput(tool)
 
         /*  Codex auto-approves through "PermissionRequest", not here  */
-        if (spec.approvalEvent !== "PreToolUse")
+        if (spec.approvalEvent !== "PreToolUse") {
+            debugLog("HOOK", "doPreToolUse: deferring to permission-request handler", tool)
             return 0
+        }
 
         /*  determine whether to auto-approve the tool invocation  */
         const { approve, reason } = this.decideApproval(tool, spec, input)
+        debugLog("HOOK", `doPreToolUse: approve=${approve}, reason=${reason}`, tool)
 
         /*  emit permission decision (or stay silent to defer to default flow).
             Anthropic Claude Code CLI expects the decision nested in "hookSpecificOutput";
@@ -699,11 +721,14 @@ export default class HookCommand {
         Staying silent (or returning a non-approval) defers to Codex's
         normal approval flow.  */
     private async doPermissionRequest (tool: Tool): Promise<number> {
+        debugLog("HOOK", "doPermissionRequest: enter", tool)
+
         /*  read tool invocation information  */
         const { spec, input } = await this.readHookInput(tool)
 
         /*  determine whether to auto-approve the tool invocation  */
         const { approve } = this.decideApproval(tool, spec, input)
+        debugLog("HOOK", `doPermissionRequest: approve=${approve}`, tool)
 
         /*  emit the Codex "PermissionRequest" approval decision  */
         if (approve) {

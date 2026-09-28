@@ -79,6 +79,13 @@ ChangeLog
     immediately. The question numbers are right-aligned to the widest one.
     Needs `CLAUDE_CODE_ENABLE_FUNCTION_HOOKS=1`
 
+-   FEATURE [tool]: Session-scoped diagnostic log for plugin analyses
+    The new module `tool/src/ase-lib-debuglog.ts` appends a per-session diagnostic log
+    `<state-dir>/session/<id>/ase.log`, deliberately independent of the regular per-project
+    logging, so it keeps working while the regular logging path itself is under analysis. The
+    hook handlers, the MCP bridge, and the service trace their entry, decision, and error points
+    into it, including a one-off dump of the working-directory-related environment variables.
+
 -   REFACTOR [tool]: Utility command group
     The utility commands `ase meta`, `ase compat`, `ase diagram`, `ase worktree`, `ase mint`, and
     `ase metric` moved below the new top-level command `ase util` (e.g. `ase util meta`), so
