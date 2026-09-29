@@ -378,7 +378,7 @@ export const renderLanes = (ctx: BoardCtx) => {
 
 /*  render the graph view  */
 export const renderGraph = (ctx: BoardCtx) => {
-    const { board, sel, dim, layout, boardH, x, y, viewH, viewW, graphView, graphTitles, mouse, pulse } = ctx
+    const { board, sel, dim, layout, boardH, x, y, viewH, viewW, graphView, graphTitles, surface, mouse, pulse } = ctx
     const card = sel.id !== "" ? board.cards.get(sel.id) : undefined
     if (layout === null)
         return [ h(Box, { key: "graph", height: boardH, marginX: 1, paddingX: 1, ...cx("frame", "border-dim") },
@@ -424,6 +424,7 @@ export const renderGraph = (ctx: BoardCtx) => {
         h(Box, { key: "keys2", ...cx("bar") },
             h(Text, cx("hint", dim && "dimmed"),
                 `D: delete task · N: new task · t: ${graphTitles ? "collapse" : "expand"} titles · ` +
+                `s: ${surface.standalone ? "hide" : "show"} standalone tasks · ` +
                 "/: filter tasks · v: view lanes")),
         h(Box, { key: "keys3", ...cx("bar") },
             h(Text, cx("hint", dim && "dimmed"),

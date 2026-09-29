@@ -117,6 +117,27 @@ Procedure
         <text/> nor prepares its check, and its checkbox stays
         *untouched*. Its <text/> stays *context only*.
 
+        You *MUST* also *skip* every bullet-point of <task-content/> in
+        checkbox state `[x]` (done), exactly as `ase-task-implement`
+        does: it was already fully resolved by a previous run, so the
+        draft neither realizes its <text/> again nor prepares its check
+        again. Its <text/> stays *context only*, too.
+
+        You *MUST* treat every bullet-point of <task-content/> in
+        checkbox state `[?]` (question) exactly like one in state `[ ]`
+        (todo), i.e., as a *regular* todo, as its grilling question just
+        stayed unanswered: the draft realizes its <text/> or prepares its
+        check.
+
+        You *MUST* *re-examine* every bullet-point of <task-content/> in
+        checkbox state `[/]` (incomplete), as a previous run resolved it
+        only *partially*: check which parts of its <text/> are not yet
+        realized or verified by the artifacts, and let the draft realize
+        or prepare the check of *only* these remaining parts.
+
+        The checkboxes of all bullet-points stay *untouched*, as only
+        `ase-task-implement` updates them.
+
     3.  Update <timestamp-modified/> with the current time in
         ISO-style format, which has to be determined by calling the
         `ase_timestamp(format: "yyyy-LL-dd HH:mm")` tool of the `ase`

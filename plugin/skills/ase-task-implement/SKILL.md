@@ -293,6 +293,23 @@ Procedure
         Its <text/> stays *context only*, e.g. to understand the other
         bullet-points.
 
+        You *MUST* also *skip* every bullet-point of <task-content/> in
+        checkbox state `[x]` (done), as it was already fully resolved by
+        a previous run: neither realize its <text/> again nor perform its
+        check again, but *do* count it as *complete* for the change set.
+        Its <text/> stays *context only*, too.
+
+        You *MUST* treat every bullet-point of <task-content/> in
+        checkbox state `[?]` (question) exactly like one in state `[ ]`
+        (todo), i.e., as a *regular* todo, as its grilling question just
+        stayed unanswered: realize its <text/> or perform its check.
+
+        You *MUST* *re-examine* every bullet-point of <task-content/> in
+        checkbox state `[/]` (incomplete), as a previous run resolved it
+        only *partially*: check which parts of its <text/> are not yet
+        realized or verified by the artifacts, and then realize or check
+        *only* these remaining parts.
+
         <if condition="<worktree-dir/> is not empty">
         The change set *MUST* land *exclusively inside* the worktree
         <worktree-dir/>: resolve *every* file path of the task plan
@@ -332,6 +349,15 @@ Procedure
             hence *all* of them for a plan whose `##  VERIFICATION (WHEN)`
             section is deliberately omitted.
 
+        -   The rules above apply to bullet-points in the states `[ ]`,
+            `[?]`, and `[/]` alike, so a `[?]` bullet-point which was
+            not resolved at all stays `[?]`, and a re-examined `[/]`
+            bullet-point becomes `[x]` once its remaining parts were
+            resolved, or otherwise stays `[/]`.
+
+        -   Leave the checkbox of every skipped `[x]` bullet-point
+            *untouched*, as it was already resolved by a previous run.
+
         -   Leave the checkbox of every skipped `[-]` and `[>]`
             bullet-point *untouched*, as only the user resolves its
             cancelled or deferred state.
@@ -346,7 +372,8 @@ Procedure
             the `solo` model, `IMPLEMENTED` for the `team` and
             `enterprise` models), but *only* if the change set was
             applied *completely* and *successfully* (with the skipped
-            `[-]` and `[>]` bullet-points not counting) -- this traverses
+            `[-]` and `[>]` bullet-points not counting, and the skipped
+            `[x]` bullet-points counting as complete) -- this traverses
             the transitions of the state machine from the current state
             up to the implemented state in one go (for the `solo` model
             directly from the initial `OPEN` state, for the `team` model

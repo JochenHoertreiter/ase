@@ -1095,10 +1095,16 @@ curl -H "Authorization: Bearer $TOKEN" \
 
 Append an attachment to the task plan.
 
-Request body: an attachment object (see *Task plans* above).
+Query parameter:
 
-Response `201` with a `Location` header pointing to the new
-attachment:
+- `append` (optional): with `true` and a request body carrying `Data`,
+  the `Data` of the *last* attachment with exactly the same `Type` (and
+  a `Data` key) is extended by the given `Data` instead, with all other
+  given keys except `Created` taken over; without such an attachment,
+  the attachment is appended as usual.
+
+Response `201` (or `200` if an existing attachment was extended) with
+a `Location` header pointing to the new (or extended) attachment:
 
 ```json
 {
@@ -1325,7 +1331,8 @@ under `added` (after an accompanying status change was applied). Only
 changes made through the API are reported, plus the changes a storage
 plugin detects itself through its optional `watch` method (like the
 task plan files changed directly in the base directory of the built-in
-plugin, or the issue changes made on GitHub, see *GitHub storage plugin* below),
+plugin, or the issue changes made on GitHub resp. GitLab, see *GitHub storage plugin*
+and *GitLab storage plugin* below),
 reported with all three parts under `updated`.
 
 Messages sent by the client are ignored. Ping frames are answered with
@@ -1584,9 +1591,14 @@ GITHUB STORAGE PLUGIN
 ---------------------
 
 The built-in `github` plugin (`ase-task-store-plugin-github.ts`,
-selected by `--module github` or the `github:`*owner*`/`*repo* form of
+selected by `--module github` or the `github:`*owner*`/`*repo* resp.
+`github+http[s]://`*host*`/`*owner*`/`*repo* form of
 `project.task.store`) persists the task plans as the *issues* of GitHub
-repositories, through the GitHub REST API. It takes the options `token`
+repositories, through the GitHub REST API. It takes the options `url`
+(the web URL of the GitHub instance, default: `https://github.com`, else
+e.g. `https://<sub>.ghe.com` of GitHub Enterprise Cloud with data
+residency, whose REST API is `https://api.<sub>.ghe.com`, or the one of a
+GitHub Enterprise Server, whose REST API is below `/api/v3`), `token`
 (default: `$GITHUB_TOKEN`, else `$GH_TOKEN`), `repos` (mapping each
 project id onto its *owner*`/`*repo*), and `poll` (the polling interval
 of the change detection in seconds, default `60`, `0` disables it):
@@ -1619,8 +1631,9 @@ plan cannot be renamed. The task plans map onto the issues as follows:
 | `Tags`                       | labels (except the reserved `ase:` ones)                         |
 | `Assignee`                   | assignee, if assignable, else the label `ase:Assignee:`*name*    |
 | `Phase`                      | milestone (created on demand)                                    |
-| `Group`                      | parent issue (sub-issues)                                        |
-| `After`                      | blocking issues ("blocked by" dependencies)                      |
+| `Group`                      | parent issue (sub-issues), else the label `ase:Group:`*id*       |
+| `After`                      | blocking issues ("blocked by" dependencies), else the label      |
+|                              | `ase:After:`*ids* (space-separated)                              |
 | `Created`, `Modified`        | creation and update time (read-only)                             |
 | any other key                | label `ase:`*key*`:`*value* (removed from the repository once    |
 |                              | unused)                                                          |
@@ -1629,7 +1642,13 @@ plan cannot be renamed. The task plans map onto the issues as follows:
 |                              | attachment                                                       |
 
 A `Group` or `After` value has to reference an existing task plan of
-the same repository. Deleting a task plan *soft-deletes* its issue: it
+the same repository. On a GitHub instance lacking sub-issues resp.
+issue dependencies (like the GitHub Enterprise Server versions before
+3.19, answering their requests with `404`), `Group` resp. `After` fall
+back onto their labels (which GitHub limits to 50 characters). On a
+GitHub Enterprise Server, the plugin requests the default REST API
+version instead of the current one, as the server answers an
+unsupported version with `410`. Deleting a task plan *soft-deletes* its issue: it
 is closed as "not planned" and labeled `ase:deleted`, which hides it
 from the task plans. The plugin detects the changes of the issues made
 outside of it by *polling* the issues updated since the last poll,
@@ -1637,3 +1656,136 @@ conditionally through the entity tag of the last poll (a `304` answer
 does not count against the rate limit), and reports them through its
 `watch` method, so they are delivered as events. Issues deleted on
 GitHub itself are not reported, as GitHub reports no deletions.
+
+GITLAB STORAGE PLUGIN
+---------------------
+
+The built-in `gitlab` plugin (`ase-task-store-plugin-gitlab.ts`,
+selected by `--module gitlab` or the `gitlab:`*namespace*`/`*project*
+resp. `gitlab://`*host*`/`*namespace*`/`*project* resp.
+`gitlab+http[s]://`*host*`/`*namespace*`/`*project* form of
+`project.task.store`) persists the task plans as the *issues* of GitLab
+projects, through the GitLab REST API v4. It takes the options `url`
+(the GitLab instance, default: `$GITLAB_HOST`, else `https://gitlab.com`),
+`token` (default: `$GITLAB_TOKEN`, a token with scope `api` and at least
+the role *Planner* in the projects), `repos` (mapping each project id onto
+its *namespace*`/`*project* path, with nested groups allowed), and `poll`
+(the polling interval of the change detection in seconds, default `60`,
+`0` disables it):
+
+```yaml
+storage:
+    plugin: gitlab
+    options:
+        url:   https://gitlab.example.com
+        token: glpat-[...]
+        repos:
+            ase: rse/ase
+```
+
+A project is registered by the label `ase:project` of its GitLab
+project, carrying the lifecycle model and task id scheme in its
+description. As with the `github` plugin, the task id scheme has to be
+a `seq` one, as a task id *is* the issue number (`iid`) rendered
+through its template: every issue of type `issue` is a task plan (the
+other work item types, like `task` or `incident`, are ignored, but
+consume issue numbers), a new task plan can only be created under the
+id of the next issue number, and a task plan cannot be renamed. The
+task plans map onto the issues as follows:
+
+| Task plan                    | GitLab issue                                                     |
+| ---------------------------- | ---------------------------------------------------------------- |
+| `#   TASK:` *title* heading  | issue title                                                      |
+| body (without heading)       | issue description                                                |
+| `Status`                     | state (closed for finished states), refined by the label         |
+|                              | `ase:Status:`*state* (`CANCELLED` is a closed issue labeled      |
+|                              | `ase:Status:CANCELLED`, as GitLab has no close reason)           |
+| `Tags`                       | labels (except the reserved `ase:` ones)                         |
+| `Assignee`                   | assignee, if a project member, else the label                    |
+|                              | `ase:Assignee:`*name*                                            |
+| `Phase`                      | milestone (created on demand as project milestone)               |
+| `After`                      | "is blocked by" issue links (tier *Premium*), else the label     |
+|                              | `ase:After:`*ids* (space-separated)                              |
+| `Created`, `Modified`        | creation and update time (read-only)                             |
+| any other key (incl. `Group`)| label `ase:`*key*`:`*value* (removed from the project once       |
+|                              | unused), as GitLab has no parent issues                          |
+| attachments                  | notes (with a hidden metadata header, the data fenced unless     |
+|                              | Markdown), where any other non-system note reads as a            |
+|                              | `text/markdown` attachment                                       |
+
+A `Group` or `After` value has to reference an existing task plan of
+the same project, and no label may contain a comma. Deleting a task
+plan *soft-deletes* its issue: it is closed and labeled `ase:deleted`,
+which hides it from the task plans. The plugin detects the changes of
+the issues made outside of it by *polling* the issues updated since the
+last poll, conditionally through the entity tag of the last poll (on
+GitLab, a `304` answer still counts against the rate limit), and
+reports them through its `watch` method, so they are delivered as
+events. Issues deleted on GitLab itself are not reported.
+
+GITEA STORAGE PLUGIN
+--------------------
+
+The built-in `gitea` plugin (`ase-task-store-plugin-gitea.ts`, selected
+by `--module gitea` or the `gitea+https://`*host*`/`*owner*`/`*repo*
+resp. `gitea+http://`*host*`/`*owner*`/`*repo* form of
+`project.task.store`) persists the task plans as the *issues* of Gitea
+repositories, through the Gitea REST API v1 (via `gitea-js`). It takes
+the options `url` (the Gitea instance, default: `https://gitea.com`),
+`token` (default: `$GITEA_TOKEN`, a token with the scopes `write:issue`
+and `read:repository` and write access to the repositories), `repos`
+(mapping each project id onto its *owner*`/`*repo*), and `poll` (the
+polling interval of the change detection in seconds, default `60`, `0`
+disables it):
+
+```yaml
+storage:
+    plugin: gitea
+    options:
+        url:   https://gitea.example.com
+        token: [...]
+        repos:
+            ase: rse/ase
+```
+
+A project is registered by the label `ase:project` of its repository,
+carrying the lifecycle model, the task id scheme, and the sequence
+number high-water mark (as Gitea never reuses the number of a deleted
+issue) in its description. As with the `github` plugin, the task id
+scheme has to be a `seq` one, as a task id *is* the issue number
+rendered through its template: every issue of the repository which is
+no pull request is a task plan, a new task plan can only be created
+under the id of the next issue number, and a task plan cannot be
+renamed. The task plans map onto the issues as follows:
+
+| Task plan                    | Gitea issue                                                      |
+| ---------------------------- | ---------------------------------------------------------------- |
+| `#   TASK:` *title* heading  | issue title                                                      |
+| body (without heading)       | issue body                                                       |
+| `Status`                     | state (closed for finished states), refined by the label         |
+|                              | `ase:Status:`*state* (`CANCELLED` is a closed issue labeled      |
+|                              | `ase:Status:CANCELLED`, as Gitea has no close reason)            |
+| `Tags`                       | labels (except the reserved `ase:` ones)                         |
+| `Assignee`                   | assignee, if assignable, else the label `ase:Assignee:`*name*    |
+| `Phase`                      | milestone (created on demand)                                    |
+| `After`                      | dependencies (the blocking issues)                               |
+| `Created`, `Modified`        | creation and update time (read-only)                             |
+| any other key (incl. `Group`)| label `ase:`*key*`:`*value* (removed from the repository once    |
+|                              | unused), as Gitea has no parent issues                           |
+| attachments                  | comments (with a hidden metadata header, the data fenced unless  |
+|                              | Markdown), where any other comment reads as a `text/markdown`    |
+|                              | attachment                                                       |
+
+A `Group` or `After` value has to reference an existing task plan of
+the same repository, and an `After` value requires the issue
+dependencies to be enabled in the repository. As Gitea refuses to close
+an issue with open dependencies, a task plan with a finished state but
+unfinished `After` task plans keeps its issue *open*, carrying the
+finished state by its `ase:Status:`*state* label only (an open issue
+with such a label reads as finished), until a later save succeeds in
+closing it. Deleting a task plan *hard-deletes* its issue, which
+requires the administration permission on the repository. The plugin
+detects the changes of the issues made outside of it by *polling* the
+issues updated since the last poll (Gitea supports no conditional
+requests), and reports them through its `watch` method, so they are
+delivered as events. Issues deleted on Gitea itself are not reported.

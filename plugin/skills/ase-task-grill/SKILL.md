@@ -140,175 +140,114 @@ Set <args>--int-reuse-task</args>.
 
         <expand name="grill-understanding" arg1="the task plan in <task-content/>"></expand>
 
-    2.  Perform *at most* <getopt-option-rounds/> grilling *rounds*,
+    2.  <if condition="the frontmatter of <task-content/> carries a `Created: <text/>` key">
+        Set <timestamp-created><text/></timestamp-created> (set
+        timestamp-created to extracted text).
+        </if>
+
+    3.  Perform *at most* <getopt-option-rounds/> grilling *rounds*,
         numbered <m/> (1-<getopt-option-rounds/>) -- the round count is
         a *maximum* only, as every round can *stop* the grilling *early*
-        in its item 3 below. Each round starts *from
-        scratch* from *only* the *current* <task-content/> -- as
-        updated by all previous rounds -- and *forgets* all questions
-        and answers gathered in previous rounds.
+        in its item 2 below.
 
         For each round:
 
         1.  INITIALIZE ROUND:
 
-            Set <round-id/> to `GRILLING ROUND <m/>/<getopt-option-rounds/>`
-            if <getopt-option-rounds/> is greater than 1, or to
+            Explicitly start *from scratch* from *only* the *current*
+            <task-content/> -- as updated by all previous rounds -- and
+            *forget* all questions and answers gathered in previous
+            rounds. Set <round-id/> to
+            `GRILLING ROUND <m/>/<getopt-option-rounds/>` if
+            <getopt-option-rounds/> is greater than 1, or to
             `GRILLING` otherwise (a single round needs no round
-            numbering). Then output only the following <template/>:
-
-            <template>
-            ⧉ **ASE**: <round-id/>: *Relentless Interviewing Until Clarity*
-            </template>
+            numbering). Do not output anything.
 
         2.  DETERMINE QUESTIONS:
 
-            Determine the essential aspects <aspect-N/> (a one- or
-            two-word-long short identifier like `Foo` or `Bar-Baz`, also
-            serving as the topic hint) and the corresponding, very brief
-            but precise decision/question <question-N/> where a shared
-            understanding is required. Each question is chosen to
-            resolve the open points related to the above understanding
-            of grilling, by focusing *only* on the *Focus Areas*
-            selected by <sections/> -- the *themes* of the focused
-            sections, *within* the *grilling scope* of each section as
-            determined in step 2.3, while the *entire* <task-content/>
-            stays the context -- and checking the mentioned *Indicators*.
-            For a section restricted to its `[?]` bullet-points, derive
-            the questions from *exactly* these bullet-points only. Never
-            raise a question about a `[-]` or `[>]` bullet-point.
+            <expand name="grill-questions"
+                arg1="<getopt-option-until/>"
+                arg2="◉ task: **<ase-task-id/>**"
+                arg3="file and directory paths, identifiers, symbols, types, commands, options, configuration keys, and literal values"
+                arg4="the <task-content/>, the code base,"
+                arg5=", and *finally* by the decision tree order, which *overrides* the impact order wherever a decision has to be asked *after* the decisions it depends on">
+                Focus *only* on the *Focus Areas* selected by
+                <sections/> -- the *themes* of the focused sections,
+                *within* the *grilling scope* of each section as
+                determined in step 2.3, while the *entire*
+                <task-content/> stays the context -- and check the
+                mentioned *Indicators*. For a section restricted to its
+                `[?]` bullet-points, derive the questions from *exactly*
+                these bullet-points only. Never raise a question about a
+                `[-]` or `[>]` bullet-point. Create a decisions/questions
+                tree for the questions, capturing the dependencies
+                between the decisions.
 
-            For each question, set <items-N/> to the bullet-points of
-            <task-content/> the question is about -- possibly *none*, if
-            the question concerns an aspect the plan does not cover yet.
+                For each question, set <items-N/> to the bullet-points of
+                <task-content/> the question is about -- possibly *none*,
+                if the question concerns an aspect the plan does not
+                cover yet.
+            </expand>
 
-            For <question-N/> use the format `Shall...?` for
-            questions of focus area `DOMAIN`, `INTERFACE`, `REGRESSION`,
-            and `CONFIRMATION`, the format `Should...?` for questions of
-            focus area `ARCHITECTURE`, and the format `May...?` for
-            questions of focus area `IMPLEMENTATION`.
+            If <grill-stop/> is `true`, skip the items 3, 4, and 6 of
+            this round, perform item 5 of this round (as the focused
+            sections are clear, they are tagged as grilled), then skip
+            all remaining rounds and continue with step 4.
 
-            In every <question-N/>, encode all *literal aspects*
-            -- file and directory paths, identifiers, symbols, types,
-            commands, options, configuration keys, and literal values --
-            with backticks. Do not output anything.
+        3.  INTERACTIVE DIALOG:
 
-        3.  DETERMINE CONTEXT:
+            In the following, you *MUST* *NOT* use your built-in
+            <user-dialog-tool/> tool! Instead, you *MUST* just show a
+            custom dialog according to the expanded `custom-dialog`
+            definition. You *MUST* closely follow this definition. The
+            dialog below carries the fixed answer option
+            `SKIP GRILLING`, dispatched as follows:
 
-            For each question, determine its focus area
-            <context-N-focus/> from the mentioned *Focus Areas*, a
-            <context-N-severity/>, describing how important this
-            question is, and a <context-N-impact/> of `HIGH`, `MEDIUM`,
-            or `LOW`, rating the individual impact of the question.
+            -   If a <result/> is `SKIP GRILLING`, ask no further
+                questions -- *all* questions of this round stay
+                *unanswered* --, continue with items 4 to 6 below
+                (updating and saving the plan with the answers of the
+                previous rounds), and afterwards skip all remaining
+                rounds and continue with step 4.
 
-            Finally, decide whether the grilling stops early:
-
-            <expand name="grill-stop" arg1="<getopt-option-until/>" arg2="◉ task: **<ase-task-id/>**"></expand>
-
-            If <grill-stop/> is `true`, skip the remaining items of
-            this round and all remaining rounds, and continue with
-            item 3.3 below.
-
-        4.  SORT QUESTIONS:
-
-            Create a decisions/questions tree for the questions,
-            capturing the dependencies between the decisions. Then
-            *sort* the questions *primarily* by the order of their
-            sections in <sections/>, *secondarily*, within each section,
-            by descending focus area order -- `DOMAIN` before
-            `INTERFACE`, `ARCHITECTURE` before `IMPLEMENTATION`, and
-            `REGRESSION` before `CONFIRMATION` --
-            *tertiarily*, within each focus area, by descending
-            <context-N-impact/>, and *finally* by the decision tree
-            order, which *overrides* the impact order wherever a
-            decision has to be asked *after* the decisions it depends
-            on. If more than 10 questions exist, drop the questions of
-            lowest <context-N-impact/> -- within equal impact the last
-            ones of the sort order first -- until a maximum of 10
-            questions remains. Then renumber <N/> according to the sort
-            order, starting at `1` in *every* round, independent of the
-            numbering of previous rounds, and set <n/> to the number of
-            remaining questions. Do not output anything.
-
-        5.  For each question <question-N/> in the iteration cycle <N/>,
-            *one at a time*:
-
-            1.  Output the following <template/>:
+            -   If a <result/> is `CANCEL`, only output the following
+                <template/> and then immediately *STOP* processing the
+                entire current skill, *not* updating the plan with the
+                current round (the plan updates saved by previous
+                rounds are kept):
 
                 <template>
-                <ase-tpl-bullet-signal/> ASPECT <N/>/<n/> ▶ **<context-N-focus/>** (<context-N-severity/>) ▷ **<aspect-N/>**
+                ⧉ **ASE**: ◉ task: **<ase-task-id/>**, ▶ status: **grilling stopped**
                 </template>
 
-            2.  Determine the answer alternatives:
+            Show a custom dialog. Its only answer option is the fixed
+            one, so the user normally answers all aspects in *one*
+            free-text reply:
 
-                1.  Check the <task-content/> for the answer <answer-N-1/>,
-                    which reflects the current plan.
+            <expand name="custom-dialog" arg1="--other">
+                <round-id/>: What is your (combined) answer to all (or a subset) of the above questions? (keywords or `nX` short responses are sufficient)
+                SKIP GRILLING: skip all remaining grilling and continue with the plan update
+            </expand>
 
-                2.  Check the code base and your world knowledge and
-                    use this information to find *up to three* grounded
-                    alternative answers <answer-N-K/> (K={2,3,4}), so there
-                    are between two and four answer options in total.
+            Dispatch `SKIP GRILLING` and `CANCEL` as defined above.
+            Otherwise, strip any leading `OTHER: ` prefix from
+            <result/> and treat the remainder as the combined free-text
+            answers to all questions of the round.
 
-                3.  For each <answer-N-K/> (K={1,2,3,4}) determine
-                    a 1-3 word label <answer-N-K-label/>, and an
-                    ultra brief description <answer-N-K-description/>
-                    of at most *10 words*. Prepend `⚑ ` to the
-                    <answer-N-K-description/> which reflects the current
-                    plan. Do not output anything.
+        4.  MERGE ANSWERS INTO PLAN:
 
-            3.  In the following, you *MUST* *NOT* use your built-in
-                <user-dialog-tool/> tool! Instead, you *MUST* just show a
-                custom dialog according to the expanded `custom-dialog`
-                definition. You *MUST* closely follow this definition.
+            Merge all gathered answers in <result/> of the round -- the
+            combined reply -- *exclusively* back into <task-content/>.
 
-                Let the user select the <answer-N/> out of the answer
-                alternatives <answer-N-K/> by raising a question with the
-                following custom dialog. Emit only the answer lines for
-                the alternatives <answer-N-K/> you actually determined in
-                the previous step (between two and four lines in total),
-                followed by the fixed `SKIP GRILLING` answer option:
+            <expand name="grill-short-responses"></expand>
 
-                <expand name="custom-dialog" arg1="--other">
-                    <aspect-N/>: <question-N/>
-                    <answer-N-1-label/>: <answer-N-1-description/>
-                    <answer-N-2-label/>: <answer-N-2-description/>
-                    [...]
-                    SKIP GRILLING: skip all remaining grilling and continue with the plan update
-                </expand>
-
-                Check the <result/> and dispatch accordingly:
-
-                -   If <result/> is `CANCEL`, only output the following
-                    <template/> and then immediately *STOP* processing
-                    the entire current skill, leaving the plan *untouched*:
-
-                    <template>
-                    ⧉ **ASE**: ◉ task: **<ase-task-id/>**, ▶ status: **grilling stopped**
-                    </template>
-
-                -   If <result/> is `SKIP GRILLING`, ask no further
-                    questions (the current question and all remaining
-                    questions of this round stay *unanswered*),
-                    continue with item 6 below (updating the plan with
-                    the answers gathered so far), and after item 6 skip
-                    all remaining rounds and continue with item 3.3
-                    below.
-
-                -   Otherwise, strip any leading `OTHER: ` prefix from
-                    <result/> and set <answer-N/> to the remainder.
-
-            4.  Output the following <template/>:
-
-                <template>
-                <ase-tpl-bullet-normal/> ASPECT <N/>/<n/> ▶ **<context-N-focus/>** (<context-N-severity/>) ▷ **<aspect-N/>**, ANSWER: **<answer-N/>**
-                </template>
-
-        6.  Update <task-content/> based on all answers <answer-N/>
-            gathered in this round. Additionally, record the *open*
-            questions in the checkboxes of the body bullet-points,
-            changing *only* checkboxes in state `[ ]` or `[?]` and
-            leaving every `[/]`, `[x]`, `[-]`, and `[>]` checkbox
-            *untouched*:
+            A question *not* addressed by the combined reply accepts its
+            answer marked with `⚑` (the current plan) if one exists, and
+            otherwise stays *unanswered*. Additionally, record the
+            *open* questions in the checkboxes of the body
+            bullet-points, changing *only* checkboxes in state `[ ]` or
+            `[?]` and leaving every `[/]`, `[x]`, `[-]`, and `[>]`
+            checkbox *untouched*:
 
             -   For each *answered* question, set the checkbox of every
                 bullet-point in <items-N/> to `[ ]`, as the question is
@@ -319,30 +258,50 @@ Set <args>--int-reuse-task</args>.
                 still open. If <items-N/> is *empty*, *add* a new `[?]`
                 bullet-point to the section of the question's focus area
                 <context-N-focus/>, with the corresponding <type/>, a
-                <summary/> derived from <aspect-N/>, and a <text/>
-                stating the open <question-N/>, so a later grilling can
-                re-ask it.
+                <summary/> derived from <context-N-topic/>, and a <text/>
+                stating the open <question-N-text/>, so a later grilling
+                can re-ask it.
 
-            Do not output anything.
+            Set <changes/> to all bullet-points of <task-content/> which
+            were changed or added in this round. Do not output anything.
 
-    3.  <if condition="the frontmatter of <task-content/> carries a `Created: <text/>` key">
-        Set <timestamp-created><text/></timestamp-created> (set
-        timestamp-created to extracted text).
-        </if>
+        5.  SAVE PLAN:
 
-    4.  For each section in <sections/>, *set* the tag
-        `grilled:<section/>` -- with <section/> being the *lower-case*
-        name of the section (`specification`, `design`, or
-        `verification`) -- in the `Tags:` frontmatter key of
-        <task-content/>: keep an already present identical tag as is,
-        otherwise append it, keeping all other already present tags
-        (including `grilled:` tags of other sections) and *creating*
-        the whole key at its position in the key order of the plan
-        <format/> if the plan carries none. A fully grilled plan hence
-        carries the tags `grilled:specification, grilled:design,
-        grilled:verification`.
+            For each section in <sections/>, *set* the tag
+            `grilled:<section/>` -- with <section/> being the
+            *lower-case* name of the section (`specification`,
+            `design`, or `verification`) -- in the `Tags:` frontmatter
+            key of <task-content/>: keep an already present identical
+            tag as is, otherwise append it, keeping all other already
+            present tags (including `grilled:` tags of other sections)
+            and *creating* the whole key at its position in the key
+            order of the plan <format/> if the plan carries none. A
+            fully grilled plan hence carries the tags
+            `grilled:specification, grilled:design,
+            grilled:verification`.
 
-    5.  <expand name="task-save-content" arg1="plan updated"></expand>
+            <expand name="task-save-content" arg1="plan updated"></expand>
+
+        6.  SHOW PLAN CHANGES:
+
+            Set <round-suffix/> to
+            ` round <m/>/<getopt-option-rounds/>` if
+            <getopt-option-rounds/> is greater than 1, or to empty
+            otherwise, and only output the following <template/>, which
+            shows every bullet-point of <changes/> in its plan format
+            `-   <box/> <type/>: **<summary/>**: <text/>`, grouped below
+            a `**<SECTION>**:` line per plan section, where an empty
+            <changes/> renders as `(none)` -- this intentionally closes
+            *every* round, so the intermediate plan changes stay
+            visible:
+
+            <template>
+            <ase-tpl-head title="PLAN CHANGES" subtitle="after grilling<round-suffix/>"/>
+
+            <changes/>
+
+            <ase-tpl-foot title="PLAN CHANGES" subtitle="after grilling<round-suffix/>"/>
+            </template>
 
 4.  **Decide Next Step:**
 
@@ -399,3 +358,4 @@ Set <args>--int-reuse-task</args>.
             <template>
             ⧉ **ASE**: ◉ task: **<ase-task-id/>**, ▶ status: **plan updated -- hand-off to implementation**
             </template>
+

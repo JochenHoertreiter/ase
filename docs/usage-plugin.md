@@ -161,10 +161,11 @@ The following ASE commands/skills exist on the task-level:
   Relentlessly interview the user about every essential aspect of the
   task plan until a shared understanding is reached, asking up to 10
   focus-area-sorted (`DOMAIN`, `INTERFACE`, `ARCHITECTURE`,
-  `IMPLEMENTATION`, `REGRESSION`, `CONFIRMATION`) questions
-  sequentially, one at a time. `--rounds` sets the maximum number of
-  grill rounds (default: `1`), each re-deriving its questions from the
-  updated plan, and `--until` stops the grilling early once all open
+  `IMPLEMENTATION`, `REGRESSION`, `CONFIRMATION`) questions per round
+  in one batch table, answered by one combined reply (with `nX` short
+  responses), as `ase-code-edit --grill`. `--rounds` sets the maximum number of
+  grill rounds (default: `1`), each saving the plan and re-deriving its
+  questions from the updated plan, and `--until` stops the grilling early once all open
   points of the given severity or higher are clear (default: `MUST`).
   `--focus` grills
   only the given plan sections (`SPECIFICATION`/`SPEC`, `DESIGN`/`DES`,

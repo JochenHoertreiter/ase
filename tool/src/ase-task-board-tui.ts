@@ -21,7 +21,7 @@ import { palette, loadPalette, cx }           from "./ase-task-board-tui-style.j
 import { sanitize, renderDialog, renderConfirm, renderTransfer, renderBusy } from "./ase-task-board-tui-popup.js"
 
 /*  render the whole screen  */
-const renderScreen = (ctx: BoardCtx) => {
+const renderScreen = (ctx: BoardCtx, project: string) => {
     const {
         columns, rows, all, board, surface, view, filter, typing, dialog, notice, carry, confirm, transfer,
         headRef, tabLabels, dialogSel, dialogLines, transferCard, transferList, dim, store, busy, busyTick
@@ -71,7 +71,7 @@ const renderScreen = (ctx: BoardCtx) => {
                         "⧉ ASE: ",
                         h(Text, cx("bold"), "Task Board"),
                         " · project: ",
-                        h(Text, cx("bold"), path.basename(Task.projectRoot())),
+                        h(Text, cx("bold"), project),
                         " · mode: ",
                         h(Text, cx("bold"), board.mode),
                         " · tasks: ",
@@ -124,7 +124,7 @@ const renderScreen = (ctx: BoardCtx) => {
 }
 
 /*  the root component of the terminal board  */
-const App = ({ log, initial }: { log: Log, initial: Board }) => {
+const App = ({ log, initial, project }: { log: Log, initial: Board, project: string }) => {
     const ctx = useBoardState(log, initial)
 
     /*  handle the keyboard and the mouse  */
@@ -147,12 +147,13 @@ const App = ({ log, initial }: { log: Log, initial: Board }) => {
         }
         handleKey(ctx, input, key)
     })
-    return renderScreen(ctx)
+    return renderScreen(ctx, project)
 }
 
 /*  run the terminal board until the user quits  */
 export const runTUI = async (log: Log): Promise<void> => {
     const initial = await buildBoard(log)
+    const project = path.basename(Task.projectRoot())
     loadPalette(log)
 
     /*  defer stderr log output while Ink draws, as it bypasses patchConsole  */
@@ -165,7 +166,7 @@ export const runTUI = async (log: Log): Promise<void> => {
     }
     process.once("exit", reset)
     try {
-        const app = render(h(App, { log, initial }), { alternateScreen: true, exitOnCtrlC: true, patchConsole: true })
+        const app = render(h(App, { log, initial, project }), { alternateScreen: true, exitOnCtrlC: true, patchConsole: true })
         await app.waitUntilExit()
     }
     finally {

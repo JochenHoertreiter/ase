@@ -114,9 +114,12 @@ The following configuration parameters control the project:
         but connecting via HTTPS, verifying the server certificate against
         the Node.js CA store (extendable via `$NODE_EXTRA_CA_CERTS`), or,
         with `?insecure`, skipping the certificate verification.
-    -   `github:`*owner*`/`*repo*: the built-in GitHub storage plugin,
-        running in-process, persisting the plans as the issues of the
-        GitHub repository *owner*`/`*repo* (see *GitHub storage plugin*
+    -   `github:`*owner*`/`*repo*, `github+https://`*host*`/`*owner*`/`*repo*,
+        or `github+http://`*host*`/`*owner*`/`*repo*: the built-in GitHub
+        storage plugin, running in-process, persisting the plans as the
+        issues of the repository *owner*`/`*repo* on GitHub resp. on the
+        GitHub instance `https://`*host* (resp. `http://`*host*), like a
+        GitHub Enterprise Server or `<sub>.ghe.com` (see *GitHub storage plugin*
         in `task-api.md`), which requires a `seq` task id scheme in
         `project.task.idscheme` (like `seq:#%d`), as the task ids are
         the issue numbers. The GitHub token is `project.task.token`,
@@ -124,11 +127,34 @@ The following configuration parameters control the project:
         `task` scopes, the repository is warned about once per project
         and repository (remembered in the per-user state directory as
         `task-github.json`), i.e. again only if the repository changes.
+    -   `gitlab:`*namespace*`/`*project*,
+        `gitlab://`*host*`/`*namespace*`/`*project*,
+        `gitlab+https://`*host*`/`*namespace*`/`*project*, or
+        `gitlab+http://`*host*`/`*namespace*`/`*project*: the built-in GitLab
+        storage plugin, running in-process, persisting the plans as the
+        issues of the GitLab project *namespace*`/`*project* (with nested
+        groups allowed) on the GitLab instance `https://`*host* (resp.
+        `http://`*host* for `gitlab+http://`), else
+        `$GITLAB_HOST`, else `https://gitlab.com` (see *GitLab storage
+        plugin* in `task-api.md`), which also requires a `seq` task id
+        scheme. The GitLab token is `project.task.token`, else
+        `$GITLAB_TOKEN`. On the `project` and `task` scopes, the project
+        is warned about as for `github:` (remembered as `task-gitlab.json`).
+    -   `gitea+https://`*host*`/`*owner*`/`*repo* or
+        `gitea+http://`*host*`/`*owner*`/`*repo*: the built-in Gitea
+        storage plugin, running in-process, persisting the plans as the
+        issues of the repository *owner*`/`*repo* on the Gitea instance
+        `https://`*host* resp. `http://`*host* (see *Gitea storage
+        plugin* in `task-api.md`), which also requires a `seq` task id
+        scheme. The Gitea token is `project.task.token`, else
+        `$GITEA_TOKEN`. On the `project` and `task` scopes, the
+        repository is warned about as for `github:` (remembered as
+        `task-gitea.json`).
 
 -   **project.task.token**: the bearer token of a remote task store
     server, used if the `project.task.store` URL embeds no token and
-    `$ASE_TASK_STORE_TOKEN` is not set, or the GitHub token of a
-    `github:` task store. It is writable on the `user`
+    `$ASE_TASK_STORE_TOKEN` is not set, or the GitHub, GitLab, resp. Gitea
+    token of a `github:`, `gitlab:`, resp. `gitea+`*scheme*`:` task store. It is writable on the `user`
     scope only (a hand-edited value on another scope is used, but warned
     about) and masked as `***` in `ase config list`.
 

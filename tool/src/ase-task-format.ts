@@ -204,6 +204,8 @@ const idSchemes: Record<string, (arg: string | undefined) => TaskIdScheme | stri
             return "template has to contain exactly one \"%d\" or \"%0<width>d\" " +
                 "and otherwise only the characters [A-Za-z#_-] (but not start with \"-\" or \"_\")"
         const width = m[2] !== undefined ? Number.parseInt(m[2], 10) : 0
+        if (width > 16)
+            return "width has to be 0-16"
 
         /*  prefix and suffix need no quoting, as [A-Za-z#_-] are no metacharacters  */
         const match = `^${m[1]}([0-9]${width > 0 ? `{${width},}` : "+"})${m[3]}$`
@@ -219,7 +221,7 @@ const idSchemes: Record<string, (arg: string | undefined) => TaskIdScheme | stri
 /*  parse a task id scheme specification  */
 export const parseIdScheme = (spec: string): TaskIdScheme => {
     const m        = /^([a-z]+)(?::(.*))?$/.exec(spec)
-    const callback = m !== null ? idSchemes[m[1]] : undefined
+    const callback = m !== null && Object.hasOwn(idSchemes, m[1]) ? idSchemes[m[1]] : undefined
     if (m === null || callback === undefined)
         throw new Error(`invalid task id scheme "${spec}" (expected "slug[:<words>]", "seq[:<template>]", or "any")`)
     const scheme = callback(m[2])
@@ -260,9 +262,13 @@ export const idWarning = (spec: string, id: string): string =>
         `task id "${id}" does not conform to the task id scheme "${spec}" (see "project.task.idscheme")`
 
 /*  the sequence number of a task id conforming to a "seq" task id scheme
-    (else 0, as for all ids under any other scheme)  */
-export const seqNumber = (scheme: TaskIdScheme, id: string): number =>
-    scheme.kind === "seq" ? Number.parseInt(new RegExp(scheme.match).exec(id)?.[1] ?? "0", 10) : 0
+    (else 0, as for all ids under any other scheme or beyond the safe integer range)  */
+export const seqNumber = (scheme: TaskIdScheme, id: string): number => {
+    if (scheme.kind !== "seq")
+        return 0
+    const n = Number.parseInt(new RegExp(scheme.match).exec(id)?.[1] ?? "0", 10)
+    return Number.isSafeInteger(n) ? n : 0
+}
 
 /*  determine the next free task id of a task id scheme, given all existing
     task ids: for "seq" the highest number of all conforming ids and of the

@@ -7,17 +7,19 @@
 import { Octokit }             from "@octokit/core"
 import { restEndpointMethods } from "@octokit/plugin-rest-endpoint-methods"
 import { paginateRest }        from "@octokit/plugin-paginate-rest"
-import { DateTime }            from "luxon"
 import { LRUCache }            from "lru-cache"
 
 import * as API                from "./ase-task-store-plugin-api.js"
 import * as TaskFormat         from "./ase-task-format.js"
+import * as TaskIssues         from "./ase-task-store-issues.js"
 
-/*  the options of the GitHub storage plugin: the access token (default:
-    $GITHUB_TOKEN, else $GH_TOKEN), the mapping of project ids onto
+/*  the options of the GitHub storage plugin: the web URL of the GitHub instance (default:
+    "https://github.com", else e.g. the one of a GitHub Enterprise Server), the access
+    token (default: $GITHUB_TOKEN, else $GH_TOKEN), the mapping of project ids onto
     "<owner>/<repo>" repositories, and the polling interval of the change
     detection in seconds (default: 60, 0 disables it)  */
 export type TaskStoragePluginOptions = {
+    url?:   string
     token?: string
     repos?: Record<string, string>
     poll?:  number
@@ -56,32 +58,31 @@ type Comment = {
 }
 
 /*  the "seq" task id scheme, the only one whose ids can be issue numbers  */
-type SeqScheme = Extract<TaskFormat.TaskIdScheme, { kind: "seq" }>
+type SeqScheme = TaskIssues.SeqScheme
 
 /*  the change detection state of a project: the "since" timestamp and the
     entity tag of the last poll, and the last seen update time per issue number  */
 type PollState = { since: string, etag?: string, seen: Map<number, string> }
 
-/*  the reserved labels: the project registry entry (carrying the lifecycle model
-    and task id scheme in its description), the soft deletion marker, and the
-    "ase:<key>:<value>" labels of the header keys without a native counterpart  */
-const LABEL_PROJECT = "ase:project"
-const LABEL_DELETED = "ase:deleted"
-const LABEL_KEY_RE  = /^ase:([A-Za-z]+):(.*)$/
+/*  the reserved labels, the task id mapping, and the timestamp of the common issue tracker parts  */
+const { LABEL_PROJECT, LABEL_DELETED, LABEL_KEY_RE, idOf, numberOf, stamp } = TaskIssues
+
+/*  the "ase:Group:<id>" and "ase:After:<ids>" labels carrying the parent resp. blocking
+    issues where the GitHub instance lacks sub-issues resp. issue dependencies (like
+    older GitHub Enterprise Server versions), the latter's task ids separated by spaces  */
+const LABEL_RELATION_RE = /^ase:(Group|After):(.*)$/
+
+/*  the REST API base URL of the web URL of a GitHub instance: GitHub itself,
+    GitHub Enterprise Cloud with data residency ("<sub>.ghe.com"), or GitHub
+    Enterprise Server (with its REST API below "/api/v3")  */
+const apiBaseOf = (base: URL): string =>
+    base.hostname.toLowerCase() === "github.com" ? "https://api.github.com" :
+        /\.ghe\.com$/i.test(base.hostname) ? `https://api.${base.host}` :
+            `${base.href.replace(/\/+$/, "")}/api/v3`
 
 /*  the header keys mapped onto native issue fields (or derived from them),
     hence never carried by "ase:<key>:<value>" labels  */
 const nativeKeys = [ "Type", "Id", "Created", "Modified", "Group", "Phase", "After", "Tags", "Assignee" ]
-
-/*  the hidden metadata header of an attachment comment  */
-const ATTACH_RE = /^<!-- ase:attachment\n([\s\S]*?)\n-->\n?([\s\S]*)$/
-
-/*  escape a hidden metadata value, so it can never close the HTML comment  */
-const escapeValue   = (value: string): string => value.replace(/&/g, "&amp;").replace(/-->/g, "--&gt;")
-const unescapeValue = (value: string): string => value.replace(/--&gt;/g, "-->").replace(/&amp;/g, "&")
-
-/*  the timestamp of the task plan format for an ISO timestamp of GitHub  */
-const stamp = (iso: string): string => DateTime.fromISO(iso).toFormat("yyyy-LL-dd HH:mm")
 
 /*  the current time as ISO timestamp in the second-precise shape of GitHub  */
 const now = (): string => new Date().toISOString().replace(/\.\d+Z$/, "Z")
@@ -94,21 +95,14 @@ const found = <T>(p: Promise<T>): Promise<T | null> => p.catch((err: unknown) =>
     throw err
 })
 
-/*  the task id of an issue number, and the issue number of a task id (0 if not conforming)  */
-const idOf = (scheme: SeqScheme, n: number): string =>
-    `${scheme.prefix}${String(n).padStart(scheme.width, "0")}${scheme.suffix}`
-const numberOf = (scheme: SeqScheme, id: string): number => {
-    const n = TaskFormat.seqNumber(scheme, id)
-    return n > 0 && idOf(scheme, n) === id ? n : 0
-}
-
 /*  the label names of an issue, and whether an issue is a live task (no pull request, not soft deleted)  */
 const labelNames = (issue: Issue): string[] =>
     issue.labels.map((label) => typeof label === "string" ? label : label.name ?? "")
 const live = (issue: Issue): boolean =>
     (issue.pull_request === undefined || issue.pull_request === null) && !labelNames(issue).includes(LABEL_DELETED)
 
-/*  the issue number an API URL of the given repository refers to (else null)  */
+/*  whether an owner/repo pair denotes the given repository, the parent issue number
+    of an issue within it (else null), and whether an issue belongs to it  */
 const sameRepo = (loc: Repo, owner: string, repo: string): boolean =>
     owner.toLowerCase() === loc.owner.toLowerCase() && repo.toLowerCase() === loc.repo.toLowerCase()
 const parentOf = (loc: Repo, issue: Issue): number | null => {
@@ -120,16 +114,6 @@ const inRepo = (loc: Repo, issue: Issue): boolean => {
     return m !== null && sameRepo(loc, m[1], m[2])
 }
 
-/*  whether an attachment is embedded as-is (Markdown) instead of as fenced code block  */
-const isMarkdown = (type: string | undefined): boolean => /^text\/markdown\b/i.test(type ?? "")
-
-/*  whether two attachments are equal  */
-const same = (a: API.TaskAttachment, b: API.TaskAttachment): boolean => {
-    const ka = Object.keys(a).sort()
-    const kb = Object.keys(b).sort()
-    return ka.length === kb.length && ka.every((key, i) => key === kb[i] && a[key] === b[key])
-}
-
 /*  the GitHub storage plugin: a project is a repository (registered by its
     "ase:project" label) and a task plan is a live issue, its id being the issue
     number rendered through the mandatory "seq" task id scheme; the title maps onto
@@ -138,9 +122,12 @@ const same = (a: API.TaskAttachment, b: API.TaskAttachment): boolean => {
     onto labels, "Assignee" onto the assignee, "Phase" onto the milestone, "Group"
     onto the parent issue, "After" onto the blocking issues, "Created"/"Modified"
     onto the issue timestamps, any other key onto "ase:<key>:<value>" labels, and
-    the attachments onto the issue comments  */
+    the attachments onto the issue comments (where "Group" and "After" fall back
+    onto "ase:Group:<id>" resp. "ase:After:<ids>" labels on instances without
+    sub-issues resp. issue dependencies)  */
 class GitHubTaskStoragePlugin implements API.TaskStoragePlugin {
     readonly name = "github"
+    private url:        string
     private gh:         Client
     private repos       = new Map<string, Repo>()
     private poll:       number
@@ -149,18 +136,31 @@ class GitHubTaskStoragePlugin implements API.TaskStoragePlugin {
     private polling     = false
     private opened      = now()
     private polls       = new Map<string, PollState>()
-    private registry    = new LRUCache<string, { value: { lifecycle: string, idscheme: string } | null }>({ max: 64, ttl: 60 * 1000 })
+    private registry    = new LRUCache<string, { value: TaskIssues.RegistryEntry | null }>({ max: 64, ttl: 60 * 1000 })
     private latest      = new Map<string, { etag: string, number: number, at: number }>()
     private labels      = new Map<string, Set<string>>()
     private milestones  = new Map<string, Map<string, number>>()
+    private unsupported = new Map<string, Set<"Group" | "After">>()
     private recent      = new Map<string, Map<number, { issue: Issue, at: number }>>()
-    private loads       = new Map<string, { at: number, load: Promise<{ issue: Issue, after: Issue[], comments: Comment[] } | null> }>()
+    private loads       = new LRUCache<string, Promise<{ issue: Issue, after: Issue[], comments: Comment[] } | null>>({ max: 256, ttl: 2 * 1000 })
 
     constructor (private ctx: API.TaskStorageContext) {
         const options = ctx.options as TaskStoragePluginOptions
         const token   = options.token ?? process.env.GITHUB_TOKEN ?? process.env.GH_TOKEN ?? ""
         if (typeof token !== "string" || token === "")
             throw new Error("task store: plugin \"github\" requires the \"token\" option (or $GITHUB_TOKEN resp. $GH_TOKEN)")
+        const url = options.url ?? "https://github.com"
+        let base: URL | null = null
+        try {
+            base = new URL(typeof url === "string" && !/^[a-z][a-z0-9+.-]*:\/\//i.test(url) ? `https://${url}` : url)
+        }
+        catch {
+            /*  reported below  */
+        }
+        if (base === null || !/^https?:$/.test(base.protocol) || base.search !== "" || base.hash !== "")
+            throw new Error(`task store: plugin "github" received invalid URL "${String(url)}" of the GitHub instance`)
+        this.url = base.href.replace(/\/+$/, "")
+        const apiBase = apiBaseOf(base)
         if (typeof options.repos !== "object" || options.repos === null || Array.isArray(options.repos))
             throw new Error("task store: plugin \"github\" requires the \"repos\" option (mapping project ids onto \"<owner>/<repo>\")")
         for (const [ prjId, spec ] of Object.entries(options.repos)) {
@@ -170,13 +170,14 @@ class GitHubTaskStoragePlugin implements API.TaskStoragePlugin {
             this.repos.set(prjId, { owner: m[1], repo: m[2] })
         }
         this.poll = options.poll ?? 60
-        if (typeof this.poll !== "number" || !Number.isFinite(this.poll) || this.poll < 0)
-            throw new Error("task store: plugin \"github\" requires a non-negative \"poll\" interval")
+        if (typeof this.poll !== "number" || !Number.isFinite(this.poll) || (this.poll !== 0 && (this.poll < 1 || this.poll > 86400)))
+            throw new Error("task store: plugin \"github\" requires a \"poll\" interval of 0 (disabled) resp. 1 to 86400 seconds")
 
         /*  route the diagnostics of Octokit into the log, as the standard
             output may carry a protocol (like the one of an MCP server)  */
         this.gh = new GitHub({
             auth:      token,
+            baseUrl:   apiBase,
             userAgent: "ase-task-store-github",
             log: {
                 debug: () => {},
@@ -187,10 +188,12 @@ class GitHubTaskStoragePlugin implements API.TaskStoragePlugin {
         })
 
         /*  request the current REST API version, as the default one ("2022-11-28") is deprecated
-            (its breaking changes do not affect this plugin, as it uses "assignees" only)  */
-        this.gh.hook.before("request", (request) => {
-            request.headers["x-github-api-version"] = "2026-03-10"
-        })
+            (its breaking changes do not affect this plugin, as it uses "assignees" only), except
+            on a GitHub Enterprise Server, which answers an unsupported version with "410"  */
+        if (!apiBase.endsWith("/api/v3"))
+            this.gh.hook.before("request", (request) => {
+                request.headers["x-github-api-version"] = "2026-03-10"
+            })
 
         /*  explain a denied access (but not an exceeded rate limit), as the
             GitHub message names neither the token source nor the missing permission  */
@@ -220,7 +223,7 @@ class GitHubTaskStoragePlugin implements API.TaskStoragePlugin {
             }, this.poll * 1000)
             this.timer.unref()
         }
-        this.ctx.log("debug", `opened ${this.repos.size} repositories (polling every ${this.poll}s)`)
+        this.ctx.log("debug", `opened ${this.repos.size} repositories on ${this.url} (polling every ${this.poll}s)`)
     }
     async close (): Promise<void> {
         if (this.timer !== null)
@@ -244,18 +247,16 @@ class GitHubTaskStoragePlugin implements API.TaskStoragePlugin {
     }
 
     /*  the registry entry of a project, read from the description of its "ase:project" label  */
-    private async registered (prjId: string): Promise<{ lifecycle: string, idscheme: string } | null> {
+    private async registered (prjId: string): Promise<TaskIssues.RegistryEntry | null> {
         const cached = this.registry.get(prjId)
         if (cached !== undefined)
             return cached.value
         const loc = this.repos.get(prjId)
-        let value: { lifecycle: string, idscheme: string } | null = null
+        let value: TaskIssues.RegistryEntry | null = null
         if (loc !== undefined) {
             const label = await found(this.gh.rest.issues.getLabel({ ...loc, name: LABEL_PROJECT }))
-            if (label !== null) {
-                const m = /^lifecycle=(\S+) idscheme=(\S+)$/.exec(label.data.description ?? "")
-                value = { lifecycle: m?.[1] ?? "solo", idscheme: m?.[2] ?? "seq:#%d" }
-            }
+            if (label !== null)
+                value = TaskIssues.registryEntry(label.data.description)
         }
         this.registry.set(prjId, { value })
         return value
@@ -267,12 +268,7 @@ class GitHubTaskStoragePlugin implements API.TaskStoragePlugin {
         const entry = await this.registered(prjId)
         if (entry === null)
             throw new Error(`project "${prjId}" not registered`)
-        const lifecycle = Object.hasOwn(TaskFormat.taskLifecycles, entry.lifecycle) ?
-            TaskFormat.taskLifecycles[entry.lifecycle] : TaskFormat.taskLifecycles.solo
-        const scheme = TaskFormat.parseIdScheme(entry.idscheme)
-        if (scheme.kind !== "seq")
-            throw new Error(`project "${prjId}" carries task id scheme "${entry.idscheme}", but GitHub requires a "seq" one`)
-        return { loc, lifecycle, scheme }
+        return { loc, ...TaskIssues.registryContext(prjId, entry, "GitHub") }
     }
 
     /*  the highest issue or pull request number of a repository (conditionally requested)  */
@@ -323,15 +319,14 @@ class GitHubTaskStoragePlugin implements API.TaskStoragePlugin {
     }
     async projectSet (prjId: string, lifecycle: string, idscheme: string): Promise<API.WriteResult> {
         const loc = this.repo(prjId)
-        if (TaskFormat.parseIdScheme(idscheme).kind !== "seq")
-            throw new Error(`task id scheme "${idscheme}" not supported, as task ids are GitHub issue numbers ` +
-                "(use a \"seq\" task id scheme like \"seq:#%d\")")
+        TaskIssues.requireSeqScheme(idscheme, "GitHub")
+
         /*  spare the requests of an unchanged (cached) registration, as the
             in-process clients re-register the project on every opening  */
         const entry = await this.registered(prjId)
         if (entry !== null && entry.lifecycle === lifecycle && entry.idscheme === idscheme)
             return "updated"
-        const description = `lifecycle=${lifecycle} idscheme=${idscheme}`
+        const description = TaskIssues.registryDescription({ lifecycle, idscheme })
         if (entry === null)
             await this.gh.rest.issues.createLabel({ ...loc, name: LABEL_PROJECT, color: "5319e7", description })
         else
@@ -375,7 +370,8 @@ class GitHubTaskStoragePlugin implements API.TaskStoragePlugin {
             { ...loc, issue_number: issue.number, per_page: 100 }) as Comment[]
     }
 
-    /*  derive the header of an issue: the natively mapped keys, "Status" from the
+    /*  derive the header of an issue: the natively mapped keys (with "Group" and
+        "After" also from their fallback labels), "Status" from the
         issue state (closed for the finished states, "not_planned" for "CANCELLED")
         refined by its "ase:Status:<state>" label, and all other keys from their
         "ase:<key>:<value>" labels  */
@@ -391,90 +387,29 @@ class GitHubTaskStoragePlugin implements API.TaskStoragePlugin {
             header.Group = idOf(scheme, parent)
         if (issue.milestone !== null)
             header.Phase = issue.milestone.title
-        if (after.length > 0)
-            header.After = after.map((blocker) => idOf(scheme, blocker.number))
-        const tags: string[] = []
-        let status: string | undefined
+        const ids = after.map((blocker) => idOf(scheme, blocker.number))
         for (const name of labelNames(issue)) {
-            const m = LABEL_KEY_RE.exec(name)
-            if (m === null && !name.startsWith("ase:"))
-                tags.push(name)
-            else if (m !== null && m[1] === "Status")
-                status = m[2]
-            else if (m !== null && (!nativeKeys.includes(m[1]) || m[1] === "Assignee"))
-                header[m[1]] = m[2]
+            const m = LABEL_RELATION_RE.exec(name)
+            if (m !== null && m[1] === "Group" && header.Group === undefined)
+                header.Group = m[2]
+            else if (m !== null && m[1] === "After")
+                ids.push(...m[2].split(/\s+/).filter((id) => id !== "" && !ids.includes(id)))
         }
-        if (tags.length > 0)
-            header.Tags = tags
+        if (ids.length > 0)
+            header.After = ids
+        const status = TaskIssues.labelHeader(header, labelNames(issue), nativeKeys)
         const assignee = issue.assignees?.[0]?.login
         if (assignee !== undefined)
             header.Assignee = assignee
-        if (issue.state === "closed")
-            header.Status = issue.state_reason === "not_planned" ? "CANCELLED" :
-                status !== undefined && status !== "CANCELLED" && lifecycle.finished.includes(status) ? status : lifecycle.finished[0]
-        else if (status !== undefined && !lifecycle.finished.includes(status))
-            header.Status = status
+        const derived = TaskIssues.issueStatus(lifecycle, issue.state === "closed", issue.state_reason === "not_planned", status)
+        if (derived !== undefined)
+            header.Status = derived
         return header
     }
 
-    /*  derive the body of an issue: the "#   TASK:" heading from the issue title plus the issue body  */
-    private body (issue: Issue): string {
-        const text = (issue.body ?? "").replace(/\r\n/g, "\n").replace(/\n+$/, "")
-        return `#   TASK: ${issue.title}\n` + (text !== "" ? `\n${text}\n` : "")
-    }
-
-    /*  derive the attachment of a comment: an attachment comment carries its keys in
-        the hidden metadata header (with "Data" giving the "|4+" or "|4-" chomping)
-        followed by the data (fenced, unless Markdown), and any other comment reads
-        as a Markdown attachment  */
+    /*  derive the attachment of a comment (see the common issue tracker parts)  */
     private attachment (comment: Comment): API.TaskAttachment {
-        const text = (comment.body ?? "").replace(/\r\n/g, "\n")
-        const m    = ATTACH_RE.exec(text)
-        if (m === null)
-            return {
-                Type:     "text/markdown",
-                Desc:     `comment by @${comment.user?.login ?? "ghost"}`,
-                Created:  stamp(comment.created_at),
-                Modified: stamp(comment.updated_at),
-                Data:     text
-            }
-        const attachment: API.TaskAttachment = {}
-        let chomp: string | undefined
-        for (const line of m[1].split("\n")) {
-            const kv = /^([A-Za-z]+):[ \t]*(.*)$/.exec(line)
-            if (kv === null)
-                continue
-            if (kv[1] === "Data")
-                chomp = kv[2].trim()
-            else
-                attachment[kv[1]] = unescapeValue(kv[2].trimEnd())
-        }
-        if (chomp !== undefined) {
-            let data = m[2]
-            if (!isMarkdown(attachment.Type))
-                data = data.replace(/^[^\n]*\n/, "").replace(/\n?[^\n]*$/, "")
-            data = data.replace(/\n+$/, "")
-            attachment.Data = data !== "" && chomp !== "|4-" ? `${data}\n` : data
-        }
-        return attachment
-    }
-
-    /*  render the comment of an attachment (see above)  */
-    private comment (attachment: API.TaskAttachment): string {
-        const lines = Object.keys(attachment).filter((key) => key !== "Data")
-            .map((key) => `${key}:`.padEnd(10) + escapeValue(attachment[key]))
-        let text = ""
-        if (attachment.Data !== undefined) {
-            const data = attachment.Data.replace(/\n$/, "")
-            lines.push("Data:".padEnd(10) + (attachment.Data !== "" && !attachment.Data.endsWith("\n") ? "|4-" : "|4+"))
-            if (isMarkdown(attachment.Type))
-                text = data
-            else {
-                const fence = "`".repeat(Math.max(3, ...Array.from(data.matchAll(/`+/g), (run) => run[0].length + 1)))
-                text = `${fence}${/diff/i.test(attachment.Type ?? "") ? "diff" : ""}\n${data}${data !== "" ? "\n" : ""}${fence}`
-            }
-        }
-        return `<!-- ase:attachment\n${lines.join("\n")}\n-->\n${text}`
+        return TaskIssues.commentAttachment(comment.body, comment.user?.login ?? "ghost", comment.created_at, comment.updated_at)
     }
 
     /*  the listing entry of an issue  */
@@ -549,15 +484,7 @@ class GitHubTaskStoragePlugin implements API.TaskStoragePlugin {
         labels of the keys without native counterpart, and the assignee if it can be
         assigned natively (keeping further native assignees), else its label  */
     private async assign (loc: Repo, header: API.TaskHeader, issue: Issue | null): Promise<{ labels: string[], assignees: string[] }> {
-        const labels: string[] = []
-        for (const [ key, value ] of Object.entries(header))
-            if (!nativeKeys.includes(key) && typeof value === "string")
-                labels.push(`ase:${key}:${value}`)
-        for (const tag of Array.isArray(header.Tags) ? header.Tags : []) {
-            if (tag.startsWith("ase:"))
-                throw new Error(`tag "${tag}" collides with the reserved "ase:" labels`)
-            labels.push(tag)
-        }
+        const labels = TaskIssues.headerLabels(header, nativeKeys)
         let assignees: string[] = []
         const assignee = header.Assignee
         if (typeof assignee === "string" && assignee !== "") {
@@ -573,26 +500,57 @@ class GitHubTaskStoragePlugin implements API.TaskStoragePlugin {
         return { labels, assignees }
     }
 
-    /*  synchronize the parent issue (keeping a parent of a foreign repository if none is wanted)  */
-    private async syncParent (loc: Repo, issue: Issue, parent: Issue | null): Promise<void> {
-        const current = parentOf(loc, issue)
-        if (parent !== null && parent.number !== current)
-            await this.gh.rest.issues.addSubIssue({ ...loc, issue_number: parent.number, sub_issue_id: issue.id, replace_parent: true })
-        else if (parent === null && current !== null)
-            await this.gh.rest.issues.removeSubIssue({ ...loc, issue_number: current, sub_issue_id: issue.id })
+    /*  run a relation request natively; returns false if the GitHub instance lacks the
+        relation (answering "404", remembered per repository, e.g. on older GitHub
+        Enterprise Server versions), so the relation has to fall back onto its label  */
+    private async native (loc: Repo, relation: "Group" | "After", request: () => Promise<unknown>): Promise<boolean> {
+        const key = `${loc.owner}/${loc.repo}`
+        let unsupported = this.unsupported.get(key)
+        if (unsupported?.has(relation))
+            return false
+        try {
+            await request()
+            return true
+        }
+        catch (err: unknown) {
+            if (statusOf(err) !== 404)
+                throw err
+            if (unsupported === undefined) {
+                unsupported = new Set()
+                this.unsupported.set(key, unsupported)
+            }
+            unsupported.add(relation)
+            return false
+        }
     }
 
-    /*  synchronize the blocking issues (within the repository)  */
-    private async syncBlockers (loc: Repo, issue: Issue, after: Issue[]): Promise<void> {
+    /*  synchronize the parent issue (keeping a parent of a foreign repository if none is
+        wanted); returns whether it is carried natively  */
+    private async syncParent (loc: Repo, issue: Issue, parent: Issue | null): Promise<boolean> {
+        const current = parentOf(loc, issue)
+        if (parent !== null && parent.number !== current)
+            return this.native(loc, "Group", () =>
+                this.gh.rest.issues.addSubIssue({ ...loc, issue_number: parent.number, sub_issue_id: issue.id, replace_parent: true }))
+        else if (parent === null && current !== null)
+            await this.gh.rest.issues.removeSubIssue({ ...loc, issue_number: current, sub_issue_id: issue.id })
+        return true
+    }
+
+    /*  synchronize the blocking issues (within the repository); returns whether
+        all of them are carried natively  */
+    private async syncBlockers (loc: Repo, issue: Issue, after: Issue[]): Promise<boolean> {
         const current = await this.blockers(loc, issue)
         const have    = new Set(current.map((blocker) => blocker.number))
         const want    = new Set(after.map((blocker) => blocker.number))
+        let native    = true
         for (const blocker of after)
             if (!have.has(blocker.number))
-                await this.gh.rest.issues.addBlockedByDependency({ ...loc, issue_number: issue.number, issue_id: blocker.id })
+                native = await this.native(loc, "After", () =>
+                    this.gh.rest.issues.addBlockedByDependency({ ...loc, issue_number: issue.number, issue_id: blocker.id })) && native
         for (const blocker of current)
             if (!want.has(blocker.number))
                 await this.gh.rest.issues.removeDependencyBlockedBy({ ...loc, issue_number: issue.number, issue_id: blocker.id })
+        return native
     }
 
     /*  synchronize the comments with the attachments by position, rewriting changed ones only  */
@@ -602,9 +560,9 @@ class GitHubTaskStoragePlugin implements API.TaskStoragePlugin {
             if (i >= attachments.length)
                 await this.gh.rest.issues.deleteComment({ ...loc, comment_id: comments[i].id })
             else if (i >= comments.length)
-                await this.gh.rest.issues.createComment({ ...loc, issue_number: issue.number, body: this.comment(attachments[i]) })
-            else if (!same(this.attachment(comments[i]), attachments[i]))
-                await this.gh.rest.issues.updateComment({ ...loc, comment_id: comments[i].id, body: this.comment(attachments[i]) })
+                await this.gh.rest.issues.createComment({ ...loc, issue_number: issue.number, body: TaskIssues.attachmentComment(attachments[i]) })
+            else if (!TaskIssues.same(this.attachment(comments[i]), attachments[i]))
+                await this.gh.rest.issues.updateComment({ ...loc, comment_id: comments[i].id, body: TaskIssues.attachmentComment(attachments[i]) })
         }
     }
 
@@ -646,8 +604,8 @@ class GitHubTaskStoragePlugin implements API.TaskStoragePlugin {
     private load (prjId: string, loc: Repo, n: number): Promise<{ issue: Issue, after: Issue[], comments: Comment[] } | null> {
         const key    = `${prjId}#${n}`
         const cached = this.loads.get(key)
-        if (cached !== undefined && Date.now() - cached.at < 2 * 1000)
-            return cached.load
+        if (cached !== undefined)
+            return cached
         const load = (async () => {
             const [ issue, comments ] = await Promise.all([
                 this.fetch(loc, n),
@@ -658,7 +616,7 @@ class GitHubTaskStoragePlugin implements API.TaskStoragePlugin {
                 return null
             return { issue, after: await this.blockers(loc, issue), comments: comments ?? [] }
         })()
-        this.loads.set(key, { at: Date.now(), load })
+        this.loads.set(key, load)
         load.catch(() => {
             this.loads.delete(key)
         })
@@ -682,7 +640,7 @@ class GitHubTaskStoragePlugin implements API.TaskStoragePlugin {
         const { issue, after, comments } = loaded
         return {
             header:     this.header(loc, lifecycle, scheme, issue, after),
-            body:       this.body(issue),
+            body:       TaskIssues.issueBody(issue.title, issue.body),
             attachment: comments.map((comment) => this.attachment(comment))
         }
     }
@@ -706,8 +664,7 @@ class GitHubTaskStoragePlugin implements API.TaskStoragePlugin {
         const { labels, assignees } = await this.assign(loc, plan.header, issue)
         const status = TaskFormat.taskStatus(plan.header, lifecycle)
         const closed = lifecycle.finished.includes(status)
-        const title  = TaskFormat.taskTitle(plan.body) || taskId
-        const body   = plan.body.replace(/^#[ \t]+TASK:.*(?:\n|$)/m, "").replace(/^\n+/, "").replace(/\n+$/, "")
+        const { title, body } = TaskIssues.planIssue(taskId, plan)
         if (issue === null) {
             /*  reject a task id deviating from the next issue number, and
                 discard an issue which lost the race for this number  */
@@ -724,8 +681,17 @@ class GitHubTaskStoragePlugin implements API.TaskStoragePlugin {
                 throw new Error(`task "${taskId}" cannot be created, as issue "${idOf(scheme, number)}" was created concurrently`)
             }
         }
-        await this.syncParent(loc, issue, parent)
-        await this.syncBlockers(loc, issue, after)
+        /*  fall back onto the labels of the relations not carried natively  */
+        const fallback: string[] = []
+        if (!await this.syncParent(loc, issue, parent) && parent !== null)
+            fallback.push(`ase:Group:${idOf(scheme, parent.number)}`)
+        if (!await this.syncBlockers(loc, issue, after))
+            fallback.push(`ase:After:${after.map((blocker) => idOf(scheme, blocker.number)).join(" ")}`)
+        for (const name of fallback)
+            if (name.length > 50)
+                throw new Error(`label "${name}" cannot be carried by GitHub, as it exceeds 50 characters`)
+        await this.ensureLabels(loc, fallback)
+        labels.push(...fallback)
         await this.syncComments(loc, issue, plan.attachment)
         const updated = (await this.gh.rest.issues.update({
             ...loc, issue_number: number, title, body, labels, assignees, milestone,
@@ -833,7 +799,7 @@ class GitHubTaskStoragePlugin implements API.TaskStoragePlugin {
             else
                 change.updated.push(await this.entry(loc, lifecycle, scheme, issue))
         }
-        if (change.added.length > 0 || change.updated.length > 0 || change.deleted.length > 0)
+        if (this.timer !== null && (change.added.length > 0 || change.updated.length > 0 || change.deleted.length > 0))
             listener(prjId, change)
     }
 }

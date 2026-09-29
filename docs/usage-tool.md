@@ -22,7 +22,8 @@ is the command-line companion tool to the *ASE* Anthropic Claude Code CLI plugin
 It provides plugin/tool setup, layered project configuration
 management, a per-project background HTTP service (bridged into the
 agent tool as an MCP server), agent hook handlers, status line
-rendering, persisted task plan management, artifact resolution,
+rendering, persisted task plan management, autonomous task lifecycle
+agents, artifact resolution,
 specification linting, exporting and previewing, and miscellaneous
 utilities like diagram rendering, identifier minting, and text measuring.
 
@@ -494,10 +495,20 @@ bearer token is the embedded *token* (warned about if configured on the
 `project` scope), else `$ASE_TASK_STORE_TOKEN`, else the
 `project.task.token` configuration (writable on the `user` scope only),
 else the `token` of the per-user `store.yaml`. Finally,
-`github:`*owner*`/`*repo* stores the plans as the issues of a GitHub
-repository through the built-in GitHub storage plugin running
+`github:`*owner*`/`*repo* resp. `github+http[s]://`*host*`/`*owner*`/`*repo*
+stores the plans as the issues of a repository on GitHub resp. a GitHub
+Enterprise instance through the built-in GitHub storage plugin running
 in-process (requiring a `seq` task id scheme, with the GitHub token
-from `project.task.token`, else `$GITHUB_TOKEN`, else `$GH_TOKEN`):
+from `project.task.token`, else `$GITHUB_TOKEN`, else `$GH_TOKEN`),
+`gitlab:`*namespace*`/`*project* resp. `gitlab://`*host*`/`*namespace*`/`*project*
+resp. `gitlab+http[s]://`*host*`/`*namespace*`/`*project* the issues of a GitLab project through the built-in GitLab storage
+plugin running in-process (likewise requiring a `seq` task id scheme,
+with the GitLab instance *host*, else `$GITLAB_HOST`, else `gitlab.com`,
+and the GitLab token from `project.task.token`, else `$GITLAB_TOKEN`), and
+`gitea+https://`*host*`/`*owner*`/`*repo* resp. `gitea+http://`*host*`/`*owner*`/`*repo*
+the issues of a Gitea repository through the built-in Gitea storage
+plugin running in-process (likewise requiring a `seq` task id scheme,
+with the Gitea token from `project.task.token`, else `$GITEA_TOKEN`):
 
 - `ase task`:
   Entry point group for task plan management. Without a subcommand,
@@ -621,7 +632,7 @@ from `project.task.token`, else `$GITHUB_TOKEN`, else `$GH_TOKEN`):
   persisted there),
   allowing cross-origin browser requests from *origin* (repeatable, `*`
   for any origin), and loading the storage plugin *name*: `ase` for the
-  built-in one, `github` for the built-in GitHub Issues one (configured
+  built-in one, `github`, `gitlab`, resp. `gitea` for the built-in GitHub, GitLab, resp. Gitea Issues one (configured
   by `storage.options`, see `task-api.md`), else the NPM package `ase-task-store-`*name* (default:
   the `storage.plugin` key of `store.yaml`, else `ase`). The built-in
   plugin stores the plans below *dir* (default: `storage.options.basedir`,
@@ -664,6 +675,8 @@ the persisted task plans of the current project:
   a tab selects it, and the mouse wheel scrolls it; `M` disables the
   mouse support to regain the regular text selection of the terminal).
   `?` hides and shows the key hint lines (terminal and web board, persisted).
+  In the graph view, `s` hides and shows the standalone tasks, i.e., the
+  tasks without any predecessors and successors (persisted).
   `e` edits the selected task plan with `$EDITOR` (default: `vi`), a
   draft which failed to save being offered again on the next `e`. In
   the lanes and graph views, `N` creates a new task by editing a
@@ -708,6 +721,37 @@ the persisted task plans of the current project:
   warned about. `--text` prints
   the lane overview as plain text, which is also the fallback without an
   interactive terminal. All views follow changes of the task plans live.
+
+The following top-level commands exist for autonomous agents driving the
+phases of the `enterprise` task lifecycle model:
+
+- `ase agent`:
+  Entry point group for the agents. Without a subcommand,
+  the help text is shown and the command exits with status 1.
+
+- `ase agent implementer` \[`-p`|`--parallel` *num*\] \[`-t`|`--timeout` *duration*\]:
+  Drive the *Implementation* phase of the `enterprise` task lifecycle
+  model (refused for any other model) until interrupted: every `PLANNED`
+  task whose `After:` predecessors are all `IMPLEMENTED` or later (or
+  `CANCELLED`, or no longer existing) is claimed into `IMPLEMENTING`
+  (in natural task id order, re-checked on every change of the task store,
+  while a task still waiting for its predecessors is reported once)
+  and implemented via
+  `claude -p --disallowedTools AskUserQuestion --permission-mode auto --permission-prompts none "/ase:ase-task-implement --next DONE <id>"`
+  (headless, with `ASE_HEADLESS=true`, where risky actions are denied
+  by the auto mode classifier instead of being prompted for). Afterwards, a task the skill put
+  into `IMPLEMENTED` is kept, while a task still in `IMPLEMENTING` is put
+  into `STALLED` (also after an implementation exceeding the *duration*
+  of `--timeout`, as `<number><unit>` with unit `s`, `m`, or `h`, default:
+  `60m`); on an interrupt (`SIGINT`/`SIGTERM`) the running implementations
+  are aborted and their tasks put back into `PLANNED`. `--parallel`
+  implements up to *num* (default: `1`) tasks in parallel, then each in
+  its own Git worktree (via `--worktree` of `ase-task-implement`). All
+  processing information, including the output of `claude`, is logged to
+  stdout with timestamp prefixes and, at the end of each implementation,
+  appended to the attachment of the task with the type
+  `text/plain; charset=utf-8; kind="agent:implementer"` (created if not
+  existing yet).
 
 The following top-level commands exist for resolving project artifact
 kinds to project-relative file lists, driven by the
@@ -904,8 +948,9 @@ STATE FILES
 - `<project>/.ase/board.yaml`:
   Display state of `ase task board`: separately for the terminal and the
   web board, the minimized lanes, the collapsed groups, whether the
-  task titles are wrapped onto multiple lines, and whether the key hint
-  lines are shown. The web state is shared by all
+  task titles are wrapped onto multiple lines, whether the key hint
+  lines are shown, and whether the graph shows the standalone tasks.
+  The web state is shared by all
   browsers and tabs showing the web board. It never holds task content.
 
 - `<project>/.ase/.gitignore`:

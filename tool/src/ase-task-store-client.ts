@@ -23,7 +23,8 @@ import * as TaskFormat                                    from "./ase-task-forma
 
 /*  the client-side view onto a task store, either the in-process
     REST API functionality on a built-in storage plugin (a local
-    "ase:<path>" or "github:<owner>/<repo>" store) or the remote REST API (an
+    "ase:<path>", "github:<owner>/<repo>", "github+http[s]://<host>/<owner>/<repo>", "gitlab:[//<host>/]<namespace>/<project>",
+    "gitlab+http[s]://<host>/<namespace>/<project>", or "gitea+http[s]://<host>/<owner>/<repo>" store) or the remote REST API (an
     "ase[s]://<addr>:<port>[/<token>]" store); a missing task plan is reported as null resp. false; the
     effective lifecycle model and task id scheme are known after the opening only  */
 export interface TaskStoreClient {
@@ -41,6 +42,7 @@ export interface TaskStoreClient {
     delete (id: string): Promise<boolean>
     purge  (age: string): Promise<string[]>
     content (id: string, index: number): Promise<{ type: string, content: Buffer } | null>
+    attach (id: string, attachment: API.TaskAttachment, append?: boolean): Promise<boolean>
     subscribe (onChange: () => void, onState?: (connected: boolean) => void): () => void
 }
 
@@ -168,6 +170,12 @@ export class LocalTaskStoreClient implements TaskStoreClient {
     content (id: string, index: number): Promise<{ type: string, content: Buffer } | null> {
         return this.missing(() => this.core.attachmentContent(this.prjId, id, String(index)), null)
     }
+    attach (id: string, attachment: API.TaskAttachment, append = false): Promise<boolean> {
+        return this.missing(async () => {
+            await this.core.attachmentAdd(this.prjId, id, attachment, append)
+            return true
+        }, false)
+    }
 
     /*  subscribe to the change events of the project, i.e. the changes made
         in-process plus the ones detected by the storage plugin itself (e.g.
@@ -222,6 +230,15 @@ export class RemoteTaskStoreClient implements TaskStoreClient {
         this.idscheme   = configuredIdScheme
         this.dispatcher = insecure ? new Agent({ connect: { rejectUnauthorized: false } }) : undefined
     }
+    /*  raise a failed connection as an unreachable store error,
+        reporting the innermost cause (like "connect ECONNREFUSED")  */
+    private unreachable (err: unknown): never {
+        let cause = err
+        while (cause instanceof Error && cause.cause instanceof Error)
+            cause = cause.cause
+        const reason = cause instanceof Error ? cause.message : String(cause)
+        throw new Error(`task: store "${this.base}" unreachable: ${reason}`, { cause: err })
+    }
     /*  perform a request: a 404 response or a tolerated error response yields
         a null result, any other error response is raised as a problem carrying
         its status, and a failed connection is raised as an unreachable store error  */
@@ -238,14 +255,7 @@ export class RemoteTaskStoreClient implements TaskStoreClient {
             dispatcher:          this.dispatcher,
             signal:              AbortSignal.timeout(10000),
             ignoreResponseError: true
-        }).catch((err: unknown) => {
-            /*  report the innermost cause (like "connect ECONNREFUSED")  */
-            let cause = err
-            while (cause instanceof Error && cause.cause instanceof Error)
-                cause = cause.cause
-            const reason = cause instanceof Error ? cause.message : String(cause)
-            throw new Error(`task: store "${this.base}" unreachable: ${reason}`, { cause: err })
-        })
+        }).catch((err: unknown) => this.unreachable(err))
         if (r.status === 404 || tolerated.includes(r.status))
             return null
         if (r.status < 200 || r.status >= 300) {
@@ -410,6 +420,10 @@ export class RemoteTaskStoreClient implements TaskStoreClient {
         const result = await this.request<{ purged: string[] }>("DELETE", `${this.tasks}?age=${encodeURIComponent(age)}`)
         return (result ?? this.unregistered()).purged
     }
+    async attach (id: string, attachment: API.TaskAttachment, append = false): Promise<boolean> {
+        return await this.task(await this.request<object>("POST",
+            `${this.tasks}/${encodeURIComponent(id)}/attachment${append ? "?append=true" : ""}`, attachment)) !== null
+    }
     async content (id: string, index: number): Promise<{ type: string, content: Buffer } | null> {
         const r = await ofetch.raw<ArrayBuffer, "arrayBuffer">(`${this.base}${this.tasks}/${encodeURIComponent(id)}/attachment/${index}/content`, {
             headers:             { Authorization: `Bearer ${this.token}` },
@@ -417,11 +431,9 @@ export class RemoteTaskStoreClient implements TaskStoreClient {
             dispatcher:          this.dispatcher,
             signal:              AbortSignal.timeout(10000),
             ignoreResponseError: true
-        }).catch((err: unknown) => {
-            throw new Error(`task: store "${this.base}" unreachable: ${err instanceof Error ? err.message : String(err)}`, { cause: err })
-        })
+        }).catch((err: unknown) => this.unreachable(err))
         if (r.status === 404)
-            return null
+            return this.task<{ type: string, content: Buffer }>(null)
         if (r.status < 200 || r.status >= 300)
             throw new Core.Problem(r.status, `store "${this.base}": HTTP ${r.status}`)
         return { type: r.headers.get("content-type") ?? "application/octet-stream", content: Buffer.from(r._data ?? new ArrayBuffer(0)) }

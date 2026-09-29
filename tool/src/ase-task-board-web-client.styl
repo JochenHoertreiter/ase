@@ -526,6 +526,11 @@ footer kbd, #dlg .dfoot kbd, #confirm .keys kbd, #transfer .keys kbd
     border-radius: 6px
     cursor: grab
 
+    /*  a zoom-independent gap between the panel border and a larger graph (also when
+        scrolled to its ends or when scrolling the selected task box into view)  */
+    padding: 16px
+    scroll-padding: 16px
+
     /*  the background is dragged for scrolling  */
     &.panning
         cursor: grabbing
@@ -540,6 +545,9 @@ footer kbd, #dlg .dfoot kbd, #confirm .keys kbd, #transfer .keys kbd
         display: block
         flex-shrink: 0
         margin: auto
+
+        /*  do not clip the pulses and edges on the graph bounds (the graph has no inner padding)  */
+        overflow: visible
     .node
         cursor: pointer
 
@@ -570,7 +578,7 @@ footer kbd, #dlg .dfoot kbd, #confirm .keys kbd, #transfer .keys kbd
     background: unquote("color-mix(in srgb, var(--c-shade) 55%, transparent)")
     z-index: 10
 
-/*  the confirmation of a task deletion and the transfer popup: a small box, centered over everything  */
+/*  the confirmation of a task deletion, the transfer popup, and the busy popup: a small box, centered over everything  */
 #confirm, #transfer, #busy
     position: fixed
     inset: 0

@@ -448,9 +448,8 @@ export const renderDialog = ({ card, group, id, pred, succ, tint, tabs, tab, fir
 
     /*  the key hints, or instead the status notice of an edit, truncated to the free width  */
     const free   = Math.max(0, innerW - pos.length - 1)
-    const keys   = notice !== null ?
-        (" " + sanitize(notice)).slice(0, free) :
-        " ←/→/⇤/⇥: switch tab · ↑/↓/⇈/⇊: scroll · e: edit · T: transition · D: delete · M: toggle mouse · ⏎/ESC: close"
+    const keys   = (notice !== null ? " " + sanitize(notice) :
+        " ←/→/⇤/⇥: switch tab · ↑/↓/⇈/⇊: scroll · e: edit · T: transition · D: delete · M: toggle mouse · ⏎/ESC: close").slice(0, free)
 
     return h(Box, { key: "dialog", top: 0, left, width, height: rows, ...cx("popup", "border-dim") },
         h(Text, {},

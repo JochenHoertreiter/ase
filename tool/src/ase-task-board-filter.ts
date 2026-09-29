@@ -119,3 +119,14 @@ export const filterBoard = (board: Board, query: string, graph = false): Board =
     }
 }
 
+/*  reduce a board onto the cards having any predecessors or successors,
+    i.e., drop the standalone cards (for the graph only)  */
+export const dropStandalone = (board: Board): Board => {
+    const kept = (id: string) => (board.pred.get(id) ?? []).length + (board.succ.get(id) ?? []).length > 0
+    return {
+        ...board,
+        cards: new Map([ ...board.cards ].filter(([ id ]) => kept(id))),
+        lanes: new Map([ ...board.lanes ].map(([ status, cards ]) => [ status, cards.filter((c) => kept(c.id)) ]))
+    }
+}
+

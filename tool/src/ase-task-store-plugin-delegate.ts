@@ -22,12 +22,14 @@ const pluginMethods = [
 export const BUILTIN_PLUGIN = "ase"
 const builtinPlugins: Record<string, string> = {
     ase:    "./ase-task-store-plugin-ase.js",
-    github: "./ase-task-store-plugin-github.js"
+    github: "./ase-task-store-plugin-github.js",
+    gitlab: "./ase-task-store-plugin-gitlab.js",
+    gitea:  "./ase-task-store-plugin-gitea.js"
 }
 
 /*  resolve a storage plugin name onto its module specifier: the name
-    "ase" (or no name) selects the default built-in plugin, "github" the
-    built-in GitHub Issues plugin, any other plain name selects the NPM
+    "ase" (or no name) selects the default built-in plugin, "github", "gitlab", resp. "gitea"
+    the built-in GitHub, GitLab, resp. Gitea Issues plugin, any other plain name selects the NPM
     package "ase-task-store-<name>", a relative or absolute path is taken
     as a local module, and anything else is passed through as a module specifier  */
 export const resolveTaskStoragePlugin = (name: string | null): string => {
@@ -75,14 +77,9 @@ export const loadTaskStoragePlugin = async (name: string | null, ctx: API.TaskSt
     for (const method of pluginMethods)
         if (typeof plugin[method] !== "function")
             throw new Error(`task store: storage plugin "${name}" lacks the "${method}" method`)
-    if (plugin.lock !== undefined && typeof plugin.lock !== "function")
-        throw new Error(`task store: storage plugin "${name}" provides a non-function "lock" property`)
-    if (plugin.fileRead !== undefined && typeof plugin.fileRead !== "function")
-        throw new Error(`task store: storage plugin "${name}" provides a non-function "fileRead" property`)
-    if (plugin.watch !== undefined && typeof plugin.watch !== "function")
-        throw new Error(`task store: storage plugin "${name}" provides a non-function "watch" property`)
-    if (plugin.projectMark !== undefined && typeof plugin.projectMark !== "function")
-        throw new Error(`task store: storage plugin "${name}" provides a non-function "projectMark" property`)
+    for (const method of [ "lock", "fileRead", "watch", "projectMark" ] as const)
+        if (plugin[method] !== undefined && typeof plugin[method] !== "function")
+            throw new Error(`task store: storage plugin "${name}" provides a non-function "${method}" property`)
     return plugin
 }
 

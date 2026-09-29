@@ -19,7 +19,7 @@ import { Config }                from "./ase-config-core.js"
 import { configSchema, webColorDefaults, webColorNames } from "./ase-config-schema.js"
 import { buildBoard, watchTasks, toneOf, laneMoves, cardMoves, BoardState, attachmentTabs, isPreflightDiff, diffTones, newTaskText, createTask, saveTask, TaskConflict } from "./ase-task-board-core.js"
 import { layoutGraph, drawGraphSVG } from "./ase-task-board-graph.js"
-import { filterBoard }           from "./ase-task-board-filter.js"
+import { filterBoard, dropStandalone } from "./ase-task-board-filter.js"
 import type { Board, StoreState } from "./ase-task-board-core.js"
 import * as TaskFormat           from "./ase-task-format.js"
 import pkg                       from "../package.json" with { type: "json" }
@@ -348,14 +348,16 @@ const registerViewRoutes = (server: Hapi.Server, log: Log): void => {
     })
 
     /*  the dependency graph as SVG, reduced onto the tasks matching the
-        filter query plus their direct predecessors and successors  */
+        filter query plus their direct predecessors and successors
+        (and optionally without the standalone tasks)  */
     server.route({
         method:  "GET",
         path:    "/task-board/api/graph",
         handler: guarded(async (request, h) => {
-            const board  = filterBoard(await currentBoard(log), filterQuery(request), true)
-            const titles = BoardState.load().web.titles
-            const svg    = board.cards.size === 0 ? "" : drawGraphSVG(board, await layoutGraph(board, "px", titles))
+            const state  = BoardState.load().web
+            const found  = filterBoard(await currentBoard(log), filterQuery(request), true)
+            const board  = state.standalone ? found : dropStandalone(found)
+            const svg    = board.cards.size === 0 ? "" : drawGraphSVG(board, await layoutGraph(board, "px", state.titles))
             return h.response({ svg })
         })
     })
@@ -457,7 +459,7 @@ const registerViewRoutes = (server: Hapi.Server, log: Log): void => {
     })
 }
 
-/*  register the update routes of the web board: task moves, surface toggles, keep-alive, and change events  */
+/*  register the update routes of the web board: task moves, saves, creations, and deletions  */
 const registerUpdateRoutes = (server: Hapi.Server, log: Log): void => {
     /*  move a task to another lane by changing its status (the change
         watcher then pushes the changed board to all open web boards)  */
@@ -550,7 +552,10 @@ const registerUpdateRoutes = (server: Hapi.Server, log: Log): void => {
             return h.response({ ok: true })
         })
     })
+}
 
+/*  register the surface routes of the web board: view changes, surface toggles, keep-alive, and change events  */
+const registerSurfaceRoutes = (server: Hapi.Server, log: Log): void => {
     /*  set the shown view (lanes or graph) of the web surface, as the view of newly opened web boards  */
     server.route({
         method:  "POST",
@@ -564,14 +569,15 @@ const registerUpdateRoutes = (server: Hapi.Server, log: Log): void => {
         })
     })
 
-    /*  toggle a minimized lane, a collapsed group, or the showing of task titles or key hints of the web surface  */
+    /*  toggle a minimized lane, a collapsed group, or the showing of task titles,
+        key hints, or standalone tasks of the web surface  */
     server.route({
         method:  "POST",
         path:    "/task-board/api/toggle",
         options: { payload: { parse: true, allow: "application/json" } },
         handler: guarded(async (request, h) => {
             const p = request.payload as { list?: unknown, entry?: unknown } | null
-            if (p !== null && (p.list === "titles" || p.list === "keys")) {
+            if (p !== null && (p.list === "titles" || p.list === "keys" || p.list === "standalone")) {
                 const surface = (await BoardState.toggleFlag("web", p.list)).web
                 emit("surface", surface)
                 return h.response(surface)
@@ -655,5 +661,6 @@ export const registerBoardRoutes = (server: Hapi.Server, log: Log): void => {
     registerPageRoutes(server, log)
     registerViewRoutes(server, log)
     registerUpdateRoutes(server, log)
+    registerSurfaceRoutes(server, log)
 }
 

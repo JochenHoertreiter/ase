@@ -648,10 +648,24 @@ export class TaskStoreCore {
                 return exact ? actual === wanted : actual.split(";")[0].trim() === wanted
             })
     }
-    async attachmentAdd (prjId: string, taskId: string, raw: unknown): Promise<number> {
+    /*  add an attachment, or on "append" extend the "Data" of the last attachment
+        with the same "Type" by its "Data" (taking over all its other keys except
+        "Created"); returns the index and whether the attachment was newly created  */
+    async attachmentAdd (prjId: string, taskId: string, raw: unknown, append = false): Promise<{ index: number, created: boolean }> {
         const attachment = this.validateAttachment(raw)
-        return this.modify(prjId, taskId, "attachment", (plan) =>
-            plan.attachment.push(attachment) - 1)
+        return this.modify(prjId, taskId, "attachment", (plan) => {
+            const index = append && attachment.Data !== undefined ?
+                plan.attachment.findLastIndex((a) => a.Type === attachment.Type && a.Data !== undefined) : -1
+            if (index < 0)
+                return { index: plan.attachment.push(attachment) - 1, created: true }
+            const existing = plan.attachment[index]
+            plan.attachment[index] = {
+                ...existing, ...attachment,
+                ...(existing.Created !== undefined ? { Created: existing.Created } : {}),
+                Data: existing.Data + attachment.Data
+            }
+            return { index, created: false }
+        })
     }
     async attachmentGet (prjId: string, taskId: string, index: string): Promise<API.TaskAttachment> {
         const { plan } = await this.read(prjId, taskId)

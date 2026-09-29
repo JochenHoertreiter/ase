@@ -234,9 +234,8 @@ const escapeXML = (s: string): string =>
     for the click delegation of the page, and holding the same HTML card
     (task id sub-box and truncated title) as the lanes  */
 export const drawGraphSVG = (board: Board, layout: GraphLayout): string => {
-    const pad   = 16
-    const out   = [ `<svg xmlns="http://www.w3.org/2000/svg" width="${layout.width + 2 * pad}" ` +
-        `height="${layout.height + 2 * pad}" viewBox="${-pad} ${-pad} ${layout.width + 2 * pad} ${layout.height + 2 * pad}">`,
+    const out   = [ `<svg xmlns="http://www.w3.org/2000/svg" width="${layout.width}" ` +
+        `height="${layout.height}" viewBox="0 0 ${layout.width} ${layout.height}">`,
     "<defs><marker id=\"arrow\" viewBox=\"0 0 10 10\" refX=\"10\" refY=\"5\" markerWidth=\"7\" markerHeight=\"7\" " +
         "orient=\"auto-start-reverse\"><path d=\"M0,0 L10,5 L0,10 z\" class=\"arrow\"/></marker></defs>" ]
     for (const e of layout.edges) {

@@ -553,8 +553,9 @@ export class TaskStoreServer {
             path:    `${T}/attachment`,
             options: json,
             handler: async (request, h) => {
-                const index = await core.attachmentAdd(p(request).prjId, p(request).taskId, request.payload)
-                return h.response({ index }).code(201).header("Location", `${request.path}/${index}`)
+                const append = this.query(request, "append") === "true"
+                const { index, created } = await core.attachmentAdd(p(request).prjId, p(request).taskId, request.payload, append)
+                return h.response({ index }).code(created ? 201 : 200).header("Location", `${request.path}/${index}`)
             }
         })
         this.server.route({

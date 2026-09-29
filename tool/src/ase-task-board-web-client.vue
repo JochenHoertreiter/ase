@@ -210,7 +210,7 @@ import { emacs, EmacsHandler }                                                  
 type Card    = { id: string, title: string, cyclic: boolean, tone: string, moves?: string[] }
 type Lane    = { status: string, active: boolean, weight: number, dashed: boolean, kind: "initial" | "regular" | "terminal", cards: Card[] }
 type Group   = { title: string, lanes: Lane[] }
-type Surface = { view: View, minimized: string[], collapsed: string[], titles: boolean, keys: boolean }
+type Surface = { view: View, minimized: string[], collapsed: string[], titles: boolean, keys: boolean, standalone: boolean }
 type Board   = { mode: string, project: string, version: string, warnings: string[], surface: Surface, moves: Record<string, string[]>, groups: Group[] }
 type Tone    = "active" | "done" | "idle"
 type Ref     = { id: string, tone: Tone }
@@ -364,7 +364,7 @@ let   graphSeq    = 0
 let   zoom        = 1
 
 /*  the derived values of the page  */
-const surface   = computed<Surface>(() => board.value?.surface ?? { view: "lanes", minimized: [], collapsed: [], titles: false, keys: true })
+const surface   = computed<Surface>(() => board.value?.surface ?? { view: "lanes", minimized: [], collapsed: [], titles: false, keys: true, standalone: true })
 const titles    = computed(() => surface.value.titles)
 const taskCount = computed(() => {
     const cards = board.value?.groups.flatMap((g) => g.lanes).flatMap((l) => l.cards)
@@ -447,6 +447,7 @@ const hints     = computed(() => {
         { key: "D",             action: "delete task" },
         { key: "N",             action: "new task" },
         { key: "t",             action: `${titles.value ? "collapse" : "expand"} titles` },
+        { key: "s",             action: `${surface.value.standalone ? "hide" : "show"} standalone tasks` },
         { key: "/",             action: "filter tasks" },
         { key: "v",             action: "view lanes" },
         { key: "+/-/0",         action: "zoom in/out/reset" }
@@ -992,11 +993,11 @@ const clearFilter = () => {
     filterEl.value?.blur()
 }
 
-/*  apply a changed surface state, with the graph re-laid out if the showing of titles changed  */
+/*  apply a changed surface state, with the graph re-laid out if the showing of titles or standalone tasks changed  */
 const applySurface = (s: Surface) => {
     if (board.value === null)
         return
-    const relayout = board.value.surface.titles !== s.titles
+    const relayout = board.value.surface.titles !== s.titles || board.value.surface.standalone !== s.standalone
     board.value.surface = s
     if (relayout && view.value === "graph")
         renderGraph()
@@ -1098,8 +1099,8 @@ watch([ sel, graph, view, task, grown ], () => {
     })
 })
 
-/*  toggle a minimized lane, a collapsed group, or the showing of task titles or key hints  */
-const toggle = async (list: "minimized" | "collapsed" | "titles" | "keys", entry: string) => {
+/*  toggle a minimized lane, a collapsed group, or the showing of task titles, key hints, or standalone tasks  */
+const toggle = async (list: "minimized" | "collapsed" | "titles" | "keys" | "standalone", entry: string) => {
     const s = await api<Surface>("/task-board/api/toggle", {
         method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ list, entry })
     })
@@ -1126,7 +1127,7 @@ const setView = (v: View) => {
     })
 }
 
-/*  connect to the service: change events, keyboard shortcuts, and keep-alive  */
+/*  the connection to the service: change event stream, keep-alive timer, and reconnect timer  */
 let events: EventSource | null = null
 let ping: ReturnType<typeof setInterval> | null = null
 let retry: ReturnType<typeof setTimeout> | null = null
@@ -1177,8 +1178,9 @@ const onEditorKey = (ev: KeyboardEvent, keymap: Keymap) => {
     }
 }
 
-/*  in the task dialog, RETURN and ESC close it, "e" edits its plan, the left/right arrows
-    switch its tab (also Tab/Shift+Tab), and the up/down arrows and PgUp/PgDn scroll its content  */
+/*  in the task dialog, RETURN and ESC close it, "e" edits its plan, "D" deletes and "T" transitions
+    its task, the left/right arrows (also Tab/Shift+Tab) switch its tab, and the up/down arrows
+    and PgUp/PgDn scroll its content  */
 const onDialogKey = (ev: KeyboardEvent) => {
     const win = planEl.value?.contentWindow ?? null
     if (ev.key === "Escape" || ev.key === "Enter")
@@ -1459,10 +1461,21 @@ const onResize = () => {
     updateScroll()
     updateTabScroll()
 }
+
+/*  keep the pulses of all task boxes in sync, by pinning every newly started
+    pulse animation onto the common origin of the document timeline  */
+const onAnimationStart = (ev: AnimationEvent) => {
+    if (ev.animationName !== "pulse")
+        return
+    for (const anim of document.getAnimations())
+        if (anim instanceof CSSAnimation && anim.animationName === "pulse" && anim.startTime !== 0)
+            anim.startTime = 0
+}
 onMounted(() => {
     connect()
     Mousetrap.bind("t", () => { if (board.value !== null) toggle("titles", "") })
-    Mousetrap.bind("v", () => setView(view.value === "lanes" ? "graph" : "lanes"))
+    Mousetrap.bind("s", () => { if (board.value !== null && view.value === "graph" && task.value === null) toggle("standalone", "") })
+    Mousetrap.bind("v", () => { if (task.value === null) setView(view.value === "lanes" ? "graph" : "lanes") })
     Mousetrap.bind("?", () => { if (board.value !== null) toggle("keys", "") })
     Mousetrap.bind("0", () => {
         if (view.value !== "graph" || task.value !== null)
@@ -1474,12 +1487,15 @@ onMounted(() => {
     Mousetrap.bind([ "+", "=" ], () => { if (view.value === "graph" && task.value === null) zoomBy(1.25) })
     Mousetrap.bind("-", () => { if (view.value === "graph" && task.value === null) zoomBy(1 / 1.25) })
     Mousetrap.bind("/", (ev) => {
+        if (task.value !== null)
+            return
         ev.preventDefault()
         filterEl.value?.focus()
     })
     window.addEventListener("keydown", onBusyKey, true)
     document.addEventListener("keydown", onKey)
     window.addEventListener("resize", onResize)
+    document.addEventListener("animationstart", onAnimationStart)
 
     /*  the keep-alive, which also notices a lost service while no events arrive  */
     ping = setInterval(async () => {
@@ -1497,6 +1513,7 @@ onBeforeUnmount(() => {
     window.removeEventListener("keydown", onBusyKey, true)
     document.removeEventListener("keydown", onKey)
     window.removeEventListener("resize", onResize)
+    document.removeEventListener("animationstart", onAnimationStart)
     if (ping !== null)
         clearInterval(ping)
     if (filterTimer !== null)

@@ -20,7 +20,7 @@ import {
 }                                             from "./ase-task-board-core.js"
 import type { Board, Card, Surface, SurfaceFlag, SurfaceList, SurfaceView, StoreState } from "./ase-task-board-core.js"
 import * as TaskFormat                        from "./ase-task-format.js"
-import { filterBoard }                        from "./ase-task-board-filter.js"
+import { filterBoard, dropStandalone }        from "./ase-task-board-filter.js"
 import { layoutGraph }                        from "./ase-task-board-graph.js"
 import type { GraphLayout, Place }            from "./ase-task-board-graph.js"
 import { fitGroups }                          from "./ase-task-board-tui-view.js"
@@ -90,38 +90,9 @@ export const mouseReporting = (on: boolean): void => {
     process.stdout.write(on ? "\x1b[?1000h\x1b[?1006h" : "\x1b[?1006l\x1b[?1000l")
 }
 
-/*  the state of the terminal board: all state, the derived values, and the actions  */
-export const useBoardState = (log: Log, initial: Board) => {
-    const { exit, suspendTerminal } = useApp()
-    const { columns, rows } = useWindowSize()
-    const [ all,     setBoard   ] = React.useState<Board>(initial)
-    const [ surface, setSurface ] = React.useState<Surface>(() => BoardState.load().tui)
-    const [ view,    setView    ] = React.useState<SurfaceView>(() => surface.view)
-    const [ filter,  setFilter  ] = React.useState("")
-    const [ typing,  setTyping  ] = React.useState(false)
-
-    /*  the shown board: all tasks reduced onto the ones matching the filter
-        query (plus, in the graph view, their direct dependencies as context)  */
-    const board = React.useMemo(() => filterBoard(all, filter, view === "graph"), [ all, filter, view ])
-    const [ sel,     setSel     ] = React.useState<Sel>(() => relocate(board, { g: 0, l: 0, id: "" }, surface))
-    const [ dialog,  setDialog  ] = React.useState<{ id: string, tab: number, first: number, scrolls: Record<number, number> } | null>(null)
-    const [ plan,    setPlan    ] = React.useState<{ id: string, parts: PlanParts } | null>(null)
-    const [ files,   setFiles   ] = React.useState<Map<string, Buffer | Error>>(new Map())
-    const [ first,   setFirst   ] = React.useState(0)
-    const [ scroll,  setScroll  ] = React.useState({ x: 0, y: 0 })
-    const [ layout,  setLayout  ] = React.useState<{ board: Board, graph: GraphLayout, titles: boolean } | null>(null)
-    const [ notice,  setNotice  ] = React.useState<string | null>(null)
-    const [ carry,   setCarry   ] = React.useState<Carry | null>(null)
-    const [ cycle,   setCycle   ] = React.useState<TaskFormat.TaskLifecycle | null>(null)
-    const [ confirm, setConfirm ] = React.useState<{ id: string, yes: boolean } | null>(null)
-    const [ transfer, setTransfer ] = React.useState<{ id: string, at: string } | null>(null)
-    const [ store,   setStore   ] = React.useState<StoreState | null>(null)
-    const [ grow,    setGrow    ] = React.useState(false)
-    const editing = React.useRef(false)
-    const drafts  = React.useRef(new Map<string, string>())
-
-    /*  track a task store operation: once the oldest of the pending operations
-        lasts longer than BUSY_DELAY, the modal busy popup shows it (with an animation tick)  */
+/*  track the task store operations: once the oldest of the pending operations
+    lasts longer than BUSY_DELAY, the modal busy popup shows it (with an animation tick)  */
+const useBusy = () => {
     const pending = React.useRef(new Map<number, BusyLabel>())
     const seq     = React.useRef(0)
     const [ busy,     setBusy     ] = React.useState<{ label: BusyLabel, since: number } | null>(null)
@@ -149,11 +120,17 @@ export const useBoardState = (log: Log, initial: Board) => {
             clearInterval(timer)
         }
     }, [ busy ])
+    return { busy, busyTick, track }
+}
 
-    /*  the rendered card, lane, and group boxes of the lane view, for the mouse hit-testing  */
+/*  the rendered boxes for the mouse hit-testing: the card, lane, and group boxes of the
+    lane view, the view value and filter field of the header, and the graph viewport content  */
+const useHitBoxes = () => {
     const cardBoxes  = React.useRef(new Map<string, DOMElement>())
     const laneBoxes  = React.useRef(new Map<string, DOMElement>())
     const groupBoxes = React.useRef(new Map<string, DOMElement>())
+    const headBoxes  = React.useRef(new Map<string, DOMElement>())
+    const graphView  = React.useRef<DOMElement | null>(null)
     const register   = (map: Map<string, DOMElement>, key: string) => (el: DOMElement | null) => {
         if (el !== null)
             map.set(key, el)
@@ -163,23 +140,59 @@ export const useBoardState = (log: Log, initial: Board) => {
     const cardRef    = (id: string) => register(cardBoxes.current, id)
     const laneRef    = (g: number, l: number) => register(laneBoxes.current, `${g}:${l}`)
     const groupRef   = (g: number) => register(groupBoxes.current, String(g))
+    const headRef    = (key: "view" | "filter" | "clear") => register(headBoxes.current, key)
+    return { cardBoxes, laneBoxes, groupBoxes, headBoxes, graphView, cardRef, laneRef, groupRef, headRef }
+}
 
-    /*  the rendered view value and filter field of the header, for the mouse hit-testing  */
-    const headBoxes = React.useRef(new Map<string, DOMElement>())
-    const headRef   = (key: "view" | "filter" | "clear") => register(headBoxes.current, key)
-
-    /*  find the registered box under a (0-based) mouse position  */
-    const boxAt = (map: Map<string, DOMElement>, mx: number, my: number): string | undefined => {
-        for (const [ key, el ] of map) {
-            const m = measureElement(el)
-            if (mx >= m.x && mx < m.x + m.width && my >= m.y && my < m.y + m.height)
-                return key
-        }
-        return undefined
+/*  find the registered box under a (0-based) mouse position  */
+const boxAt = (map: Map<string, DOMElement>, mx: number, my: number): string | undefined => {
+    for (const [ key, el ] of map) {
+        const m = measureElement(el)
+        if (mx >= m.x && mx < m.x + m.width && my >= m.y && my < m.y + m.height)
+            return key
     }
+    return undefined
+}
 
-    /*  the rendered graph viewport content, for the mouse hit-testing  */
-    const graphView = React.useRef<DOMElement | null>(null)
+/*  the state of the terminal board: all state, the derived values, and the actions  */
+export const useBoardState = (log: Log, initial: Board) => {
+    const { exit, suspendTerminal } = useApp()
+    const { columns, rows } = useWindowSize()
+    const [ all,     setBoard   ] = React.useState<Board>(initial)
+    const [ surface, setSurface ] = React.useState<Surface>(() => BoardState.load().tui)
+    const [ view,    setView    ] = React.useState<SurfaceView>(() => surface.view)
+    const [ filter,  setFilter  ] = React.useState("")
+    const [ typing,  setTyping  ] = React.useState(false)
+
+    /*  the shown board: all tasks reduced onto the ones matching the filter
+        query (plus, in the graph view, their direct dependencies as context,
+        and optionally without the standalone tasks)  */
+    const board = React.useMemo(() => {
+        const found = filterBoard(all, filter, view === "graph")
+        return view === "graph" && !surface.standalone ? dropStandalone(found) : found
+    }, [ all, filter, view, surface.standalone ])
+    const [ sel,     setSel     ] = React.useState<Sel>(() => relocate(board, { g: 0, l: 0, id: "" }, surface))
+    const [ dialog,  setDialog  ] = React.useState<{ id: string, tab: number, first: number, scrolls: Record<number, number> } | null>(null)
+    const [ plan,    setPlan    ] = React.useState<{ id: string, parts: PlanParts } | null>(null)
+    const [ files,   setFiles   ] = React.useState<Map<string, Buffer | Error>>(new Map())
+    const [ first,   setFirst   ] = React.useState(0)
+    const [ scroll,  setScroll  ] = React.useState({ x: 0, y: 0 })
+    const [ layout,  setLayout  ] = React.useState<{ board: Board, graph: GraphLayout, titles: boolean } | null>(null)
+    const [ notice,  setNotice  ] = React.useState<string | null>(null)
+    const [ carry,   setCarry   ] = React.useState<Carry | null>(null)
+    const [ cycle,   setCycle   ] = React.useState<TaskFormat.TaskLifecycle | null>(null)
+    const [ confirm, setConfirm ] = React.useState<{ id: string, yes: boolean } | null>(null)
+    const [ transfer, setTransfer ] = React.useState<{ id: string, at: string } | null>(null)
+    const [ store,   setStore   ] = React.useState<StoreState | null>(null)
+    const [ grow,    setGrow    ] = React.useState(false)
+    const editing = React.useRef(false)
+    const drafts  = React.useRef(new Map<string, string>())
+
+    /*  the busy popup of slow task store operations  */
+    const { busy, busyTick, track } = useBusy()
+
+    /*  the rendered boxes for the mouse hit-testing  */
+    const { cardBoxes, laneBoxes, groupBoxes, headBoxes, graphView, cardRef, laneRef, groupRef, headRef } = useHitBoxes()
 
     /*  report mouse clicks while the board runs and mouse support is enabled
         (disabling it gives the regular text selection of the terminal back)  */
@@ -298,13 +311,17 @@ export const useBoardState = (log: Log, initial: Board) => {
     /*  fetch the file content of the attachment of the selected tab, whenever the tab is selected or the plan changes
         (the latter in the background, i.e. without the busy popup)  */
     React.useEffect(() => {
-        const parts = plan !== null && plan.id === dialogId ? plan.parts : undefined
-        if (parts === undefined || parts === null || parts instanceof Error || dialogTab === 0 || parts.atts[dialogTab - 1]?.file === undefined)
+        if (plan === null || plan.id !== dialogId)
             return
-        const id  = plan!.id
-        const key = `${id}:${dialogTab}`
+        const { id, parts } = plan
+        if (parts === undefined || parts === null || parts instanceof Error)
+            return
+        const tab = Math.min(dialogTab, parts.atts.length)
+        if (tab === 0 || parts.atts[tab - 1].file === undefined)
+            return
+        const key = `${id}:${tab}`
         let live = true
-        const load = Task.attachmentContent(log, id, dialogTab - 1)
+        const load = Task.attachmentContent(log, id, tab - 1)
         const run  = files.has(key) ? load : track({ text: "loading attachment of task", id }, load)
         run.then((content) =>
             content?.content ?? new Error("no such attachment content")
@@ -496,7 +513,7 @@ export const useBoardState = (log: Log, initial: Board) => {
         })
     }
 
-    /*  toggle a flag (task titles or key hints) of the TUI surface  */
+    /*  toggle a flag (task titles, key hints, or standalone tasks) of the TUI surface  */
     const toggleFlag = (flag: SurfaceFlag): void => {
         BoardState.toggleFlag("tui", flag).then((state) => {
             setSurface(state.tui)

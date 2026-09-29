@@ -60,11 +60,11 @@ export type Board = {
 }
 
 /*  the per-surface view state: the shown view, minimized lanes, collapsed groups, and
-    whether the task titles and the key hints are shown  */
-export type Surface     = { view: SurfaceView, minimized: string[], collapsed: string[], titles: boolean, keys: boolean }
+    whether the task titles, the key hints, and the standalone tasks of the graph are shown  */
+export type Surface     = { view: SurfaceView, minimized: string[], collapsed: string[], titles: boolean, keys: boolean, standalone: boolean }
 export type SurfaceView = "lanes" | "graph"
 export type SurfaceList = "minimized" | "collapsed"
-export type SurfaceFlag = "titles" | "keys"
+export type SurfaceFlag = "titles" | "keys" | "standalone"
 
 /*  the persisted board state of a project  */
 export type State = { tui: Surface, web: Surface }
@@ -137,18 +137,19 @@ export const splitHeight = (total: number, weights: number[], min = 0): number[]
 
 /*  the valibot schema of the persisted board state  */
 const surfaceSchema = v.object({
-    view:      v.optional(v.picklist([ "lanes", "graph" ]), "lanes"),
-    minimized: v.optional(v.array(v.string()), []),
-    collapsed: v.optional(v.array(v.string()), []),
+    view:       v.optional(v.picklist([ "lanes", "graph" ]), "lanes"),
+    minimized:  v.optional(v.array(v.string()), []),
+    collapsed:  v.optional(v.array(v.string()), []),
 
     /*  (a string of an older state file maps "all" onto true, else false)  */
-    titles:    v.optional(v.pipe(v.union([ v.boolean(), v.string() ]),
+    titles:     v.optional(v.pipe(v.union([ v.boolean(), v.string() ]),
         v.transform((t) => typeof t === "boolean" ? t : t === "all")), false),
-    keys:      v.optional(v.boolean(), true)
+    keys:       v.optional(v.boolean(), true),
+    standalone: v.optional(v.boolean(), true)
 })
 const stateSchema = v.object({
-    tui: v.optional(surfaceSchema, { view: "lanes", minimized: [], collapsed: [], titles: false, keys: true }),
-    web: v.optional(surfaceSchema, { view: "lanes", minimized: [], collapsed: [], titles: false, keys: true })
+    tui: v.optional(surfaceSchema, { view: "lanes", minimized: [], collapsed: [], titles: false, keys: true, standalone: true }),
+    web: v.optional(surfaceSchema, { view: "lanes", minimized: [], collapsed: [], titles: false, keys: true, standalone: true })
 })
 
 /*  reusable functionality: the persisted per-project board state in
@@ -216,7 +217,7 @@ export class BoardState {
         })
     }
 
-    /*  toggle the showing of task titles or key hints  */
+    /*  toggle the showing of task titles, key hints, or standalone tasks  */
     static toggleFlag (surface: "tui" | "web", flag: SurfaceFlag): Promise<State> {
         return BoardState.update((state) => {
             state[surface][flag] = !state[surface][flag]

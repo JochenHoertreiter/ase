@@ -27,38 +27,44 @@ interfaces, must be clarified), `ARCHITECTURE` (structure, wiring,
 placement, or dependencies, should be clarified), `IMPLEMENTATION`
 (inner technical details, can be clarified), `REGRESSION` (what must
 not break, should be clarified), or `CONFIRMATION` (what proves the
-specified behavior, should be clarified) -- and a 1-2 word `ASPECT`
+specified behavior, should be clarified) -- and a 1-3 word `TOPIC`
 hint. The focus areas are selected by the plan sections under focus
 (`--focus`): `SPECIFICATION` selects `DOMAIN` and `INTERFACE`, `DESIGN`
 selects `ARCHITECTURE` and `IMPLEMENTATION`, and `VERIFICATION` selects
 `REGRESSION` and `CONFIRMATION`. The questions are sorted
-primarily by the given section order, secondarily by descending focus
-area importance, tertiarily by descending individual impact, and
-finally by the decision tree of their dependencies, so each decision is
-asked after the decisions it depends on. It honors checks
+by descending focus area importance, then by descending individual
+impact, and finally by the decision tree of their dependencies, so each
+decision is asked after the decisions it depends on. It honors checks
 for *fuzzy language*, *conflicting terminology*, *conflicting code*,
 *non-concrete scenarios*, *unspecified architecture patterns*, and
 *unspecified dependencies*.
 
-In contrast to the batch grilling of `ase-code-edit --grill`, the
-questions are asked *sequentially*, one at a time: each question is
-announced as an `ASPECT n/N ▶ FOCUS ▷ ASPECT, QUESTION` line and then
-raised via an interactive dialog presenting two to four *grounded*
-answer alternatives labeled `A1`-`A4` (the current plan, marked with
-`⚑`, plus alternatives derived from the code base and world knowledge),
-the fixed `SKIP GRILLING` option (skip the remaining questions and
-rounds, keeping the answers gathered so far), and free-text input.
-Cancelling the dialog stops the skill and leaves the plan untouched.
-Once all aspects are resolved, the plan is updated and persisted, its
-`Tags:` frontmatter key records each grilled section as its own tag
-`grilled:`*section* (lower-case, kept alongside the tags of previously
-grilled sections, e.g. `grilled:specification, grilled:design`), and
-the user is offered a hand-off to editing,
-implementation, or preflight.
+As with `ase-code-edit --grill`, all questions of a round are announced
+together below a `GRILLING ROUND K/L` line (plain `GRILLING` for a
+single round) as a `QUESTION`/`ANSWERS` table with one row per
+question, each row carrying two to three *grounded* answer alternatives
+(the one reflecting the current plan marked with `⚑`). They are then
+asked in *one* batch via a single interactive dialog, whose only answer
+option is the fixed `SKIP GRILLING` (skip the remaining grilling, but
+still update the plan with the answers of the previous rounds), plus
+free-text input. The questions are numbered `1`, `2`, etc. and their
+answer alternatives are lettered `A`, `B`, etc., so the free-text input
+can cherry-pick answers with short responses matching `\d+[a-zA-Z]`
+(like `1A 2c`), freely mixed with keyword text. A question not
+addressed by the reply accepts its `⚑` answer, if one exists.
+Cancelling the dialog stops the skill without updating the plan with
+the current round. After every round, the plan is updated and
+persisted, its `Tags:` frontmatter key records each grilled section as
+its own tag `grilled:`*section* (lower-case, kept alongside the tags of
+previously grilled sections, e.g. `grilled:specification,
+grilled:design`), and a `PLAN CHANGES` box shows the bullet-points
+changed by the round. Finally, the user is offered a hand-off to
+editing, implementation, or preflight.
 
 The *open* questions are recorded in the checkboxes of the plan's
 bullet-points: a bullet-point whose question stayed *unanswered*
-(because the grilling was skipped) is marked `[?]`, an unanswered
+(because the grilling was skipped, or the reply did not address a
+question the plan offers no answer for) is marked `[?]`, an unanswered
 question the plan does not cover yet is added as a new `[?]`
 bullet-point, and an *answered* question resets its bullet-points to
 `[ ]`. When a section is grilled *again* (its `grilled:`*section* tag
@@ -70,9 +76,9 @@ in state `[-]` (cancelled) or `[>]` (deferred) are never questioned.
 
 -   `--rounds`|`-r` *n*:
     The *maximum* number of grill rounds to apply (default: `1`). Each
-    round starts from scratch from only the current plan, as updated by
-    all previous rounds, and re-derives its questions from it, forgetting
-    all questions and answers of previous rounds. With more than one
+    round starts from scratch from only the current plan, as updated and
+    saved by all previous rounds, and re-derives its questions from it,
+    forgetting all questions and answers of previous rounds. With more than one
     round, each round is announced as `GRILLING ROUND K/L`. The grilling
     stops early -- announced by a `grilling finished early` status line
     -- once a round, even the first one, finds the open points clear

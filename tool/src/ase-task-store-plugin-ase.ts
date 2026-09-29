@@ -326,9 +326,9 @@ class FileTaskStoragePlugin implements API.TaskStoragePlugin {
 
     /*  the referenced attachment files, confined to the project directory  */
     async fileRead (prjId: string, file: string): Promise<Buffer | null> {
-        const dir  = path.resolve(this.dir(prjId))
-        const full = path.resolve(dir, file)
-        if (!full.startsWith(dir + path.sep))
+        const dir  = await fs.promises.realpath(this.dir(prjId)).catch(() => null)
+        const full = dir !== null ? await fs.promises.realpath(path.resolve(dir, file)).catch(() => null) : null
+        if (dir === null || full === null || !full.startsWith(dir + path.sep))
             return null
         const st = await fs.promises.stat(full).catch(() => null)
         if (st === null || !st.isFile())

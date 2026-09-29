@@ -175,7 +175,7 @@ empty <todo-what/> or <todo-how/> renders as `(none)`:
     2.  Perform *at most* <getopt-option-grill-rounds/> grilling
         *rounds*, numbered <m/> (1-<getopt-option-grill-rounds/>) --
         the round count is a *maximum* only, as every round can
-        *stop* the grilling *early* in its item 3 below.
+        *stop* the grilling *early* in its item 2 below.
 
         For each round:
 
@@ -191,100 +191,18 @@ empty <todo-what/> or <todo-how/> renders as `(none)`:
 
         2.  DETERMINE QUESTIONS:
 
-            Determine the questions, comprised of a round-local id
-            <question-N-id/> of `<N/>` -- where <N/> restarts at `1`
-            in *every* round, independent of the numbering of previous
-            rounds --, and a very brief but precise question text
-            <question-N-text/>. Each question is chosen to
-            resolve the open points related to the above understanding
-            of grilling, by focusing on the mentioned *Focus Areas*.
-
-            For <question-N-text/> use the format `Shall...?` for
-            questions of focus area `DOMAIN`, `INTERFACE`, `REGRESSION`,
-            and `CONFIRMATION`, the format `Should...?` for questions of
-            focus area `ARCHITECTURE`, and the format `May...?` for
-            questions of focus area `IMPLEMENTATION`.
-
-            In every <question-N-text/>, encode all *literal aspects*
-            -- file and directory paths, identifiers, symbols, types,
-            commands, options, configuration keys, and literal values --
-            with backticks.
-
-            Keep every <question-N-text/> at most *200 characters* long
-            -- compact the text until it fits --, as a longer question
-            overflows its table cell and silently degrades the entire
-            table into a plain text rendering.
-
-        3.  DETERMINE CONTEXT:
-
-            For each question, determine its focus area
-            <context-N-focus/> from the mentioned *Focus Areas*, a 1-3
-            word hint <context-N-topic/>, describing what the question
-            is about, a <context-N-severity/>, describing how
-            important this question is, and a <context-N-impact/> of
-            `HIGH`, `MEDIUM`, or `LOW`, rating the individual impact
-            of the question.
-
-            Set <context-N-id/> to `DOM` for <context-N-focus/> of
-            `DOMAIN`, `IFC` for <context-N-focus/> of `INTERFACE`, `ARC`
-            for <context-N-focus/> of `ARCHITECTURE`, `IMP` for
-            <context-N-focus/> of `IMPLEMENTATION`, `REG` for
-            <context-N-focus/> of `REGRESSION`, and `CON` for
-            <context-N-focus/> of `CONFIRMATION`.
-
-            Finally, decide whether the grilling stops early:
-
-            <expand name="grill-stop" arg1="<getopt-option-grill-until/>" arg2="✪ skill: **ase-code-edit**"></expand>
+            <expand name="grill-questions"
+                arg1="<getopt-option-grill-until/>"
+                arg2="✪ skill: **ase-code-edit**"
+                arg3="file and directory paths, identifiers, symbols, types, commands, options, configuration keys, and literal values"
+                arg4="the code base"
+                arg5=""></expand>
 
             If <grill-stop/> is `true`, skip the remaining items of
             this round and all remaining rounds, and continue with
             the *implementing* state.
 
-        4.  SORT QUESTIONS:
-
-            Finally, *sort* the questions by descending focus area
-            order -- first all `DOMAIN`, then all `INTERFACE`, then all
-            `ARCHITECTURE`, then all `IMPLEMENTATION`, then all
-            `REGRESSION`, and then all `CONFIRMATION` ones -- and,
-            within each focus area, by descending
-            <context-N-impact/>. If more than 10 questions exist,
-            drop the questions of lowest <context-N-impact/> -- within
-            equal impact the ones of lowest focus area order first --
-            until a maximum of 10 questions remains. Then renumber
-            <N/> according to the sort order, starting at `1`, and set
-            <n/> to the number of remaining questions. Do not output
-            anything.
-
-            Finally, assemble the <question-N/> out of
-            `**<question-N-id/>** ▶ **<context-N-id/>** ▷
-            **<context-N-topic/>**: <question-N-text/>`.
-
-        5.  DETERMINE ANSWERS:
-
-            For all remaining <question-N/>, check the code base and
-            your world knowledge to find *two to three* grounded answer
-            alternatives <answer-N-K/> with a question-local id
-            <answer-N-K-id/> of the <K/>-th upper-case letter (`A`, `B`,
-            `C`) -- where <K/> restarts at `1` for *every* question,
-            independent of the numbering of other questions --, a 1-3
-            word label <answer-N-K-label/>, and
-            an ultra brief description <answer-N-K-description/> of
-            at most *10 words*. For the answer which reflects the
-            current <todo-what/>/<todo-how/> understanding, append
-            ` ⚑` to its <answer-N-K-label/>.
-
-            Assemble an <answer-N/> out of `**<answer-N-1-id/>**
-            ▶ **<answer-N-1-label/>**: <answer-N-1-description/>,
-            **<answer-N-2-id/>** ▶ **<answer-N-2-label/>**:
-            <answer-N-2-description/>[, ...]`.
-
-            Keep every assembled <answer-N/> at most *240 characters*
-            long -- drop the least relevant alternative and compact the
-            descriptions until it fits -- as a longer answer overflows
-            its table cell and silently degrades the entire table into a
-            plain text rendering.
-
-        6.  INTERACTIVE DIALOG:
+        3.  INTERACTIVE DIALOG:
 
             In the following, you *MUST* *NOT* use your built-in
             <user-dialog-tool/> tool! Instead, you *MUST* just show a
@@ -294,8 +212,8 @@ empty <todo-what/> or <todo-how/> renders as `(none)`:
             `SKIP GRILLING` and `STOP SKILL`, dispatched as follows:
 
             -   If a <result/> is `SKIP GRILLING` or `CANCEL`, ask no
-                further questions, continue with item 7 below (merging
-                the answers gathered so far), and after item 8 skip all
+                further questions, continue with item 4 below (merging
+                the answers gathered so far), and after item 5 skip all
                 remaining rounds and continue with the *implementing*
                 state.
 
@@ -307,64 +225,31 @@ empty <todo-what/> or <todo-how/> renders as `(none)`:
                 ⧉ **ASE**: ✪ skill: **ase-code-edit**, ▶ status: **editing stopped**
                 </template>
 
-            1.  Output only the following <template/> -- it lists *all*
-                questions of the round up-front, one table row per
-                aspect, so the subsequent dialog only has to ask for the
-                combined answer. Align all column edges of the table.
+            Show a custom dialog. Its only answer options are the
+            two fixed ones, so the user normally answers all aspects in
+            *one* free-text reply:
 
-                In every table cell you *MUST* escape each literal pipe
-                character outside a code span as `\|` and you *MUST*
-                open *and* close every backtick code span within the
-                *same* cell -- an unescaped pipe or an unbalanced
-                backtick run splits the cell and silently degrades the
-                entire table into a plain text rendering:
+            <expand name="custom-dialog" arg1="--other">
+                <round-id/>: What is your (combined) answer to all (or a subset) of the above questions? (keywords or `nX` short responses are sufficient)
+                SKIP GRILLING: skip all remaining grilling and continue with the implementation
+                STOP SKILL: stop the entire skill immediately
+            </expand>
 
-                <template>
-                ⧉ **ASE**: <round-id/>: *Relentless Interviewing Until Clarity*
+            Dispatch `SKIP GRILLING`, `STOP SKILL`, and `CANCEL` as
+            defined above. Otherwise, strip any leading `OTHER: `
+            prefix from <result/> and treat the remainder as the
+            combined free-text answers to all questions of the
+            round.
 
-                | QUESTION      | ANSWERS     |
-                | ------------- | ----------- |
-                | <question-1/> | <answer-1/> |
-                | <question-2/> | <answer-2/> |
-                | [...]         | [...]       |
-
-                Legend: **DOM**: Domain       (MUST)    **IFC**: Interface      (MUST)    **n**: round-local question number
-                        **ARC**: Architecture (SHOULD)  **IMP**: Implementation (MAY)     **X**: question-local answer letter
-                        **REG**: Regression   (SHOULD)  **CON**: Confirmation   (SHOULD)  ⚑: current decision state
-                </template>
-
-            2.  Show a custom dialog. Its only answer options are the
-                two fixed ones, so the user normally answers all aspects in
-                *one* free-text reply:
-
-                <expand name="custom-dialog" arg1="--other">
-                    <round-id/>: What is your (combined) answer to all (or a subset) of the above questions? (keywords or `nX` short responses are sufficient)
-                    SKIP GRILLING: skip all remaining grilling and continue with the implementation
-                    STOP SKILL: stop the entire skill immediately
-                </expand>
-
-                Dispatch `SKIP GRILLING`, `STOP SKILL`, and `CANCEL` as
-                defined above. Otherwise, strip any leading `OTHER: `
-                prefix from <result/> and treat the remainder as the
-                combined free-text answers to all questions of the
-                round.
-
-        7.  MERGE ANSWERS INTO TODO:
+        4.  MERGE ANSWERS INTO TODO:
 
             Merge all gathered answers in <result/> of the round -- the
             combined reply -- *exclusively* back into <todo-what/> and
             <todo-how/>. Do not output anything.
 
-            Within the combined reply, recognize every token matching
-            the regexp `\d+[a-zA-Z]` (like `1A`, separated by whitespace
-            or commas, and freely mixed with keyword text) as a *short
-            response*, which cherry-picks for the question with
-            <question-N-id/> equal to its number the answer with
-            <answer-N-K-id/> equal to its letter (case-insensitive). A
-            token referencing a non-existing question or answer is
-            treated as plain free text.
+            <expand name="grill-short-responses"></expand>
 
-        8.  SHOW CURRENT TODO:
+        5.  SHOW CURRENT TODO:
 
             Set <round-suffix/> to
             ` round <m/>/<getopt-option-grill-rounds/>` if

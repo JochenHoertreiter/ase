@@ -240,6 +240,9 @@ You *MUST* honor the following hints on this *task* format:
     make a bullet-point *inert*: grilling asks *no* question about it,
     pre-flighting and implementation neither realize nor check it, and
     *every* skill leaves its checkbox *untouched* until the user changes it.
+    On implementation, a `[?]` bullet-point is a *regular* todo like `[ ]`,
+    a `[x]` bullet-point is *skipped* as already resolved, and a `[/]`
+    bullet-point is *re-examined* for its still unresolved parts.
 
     The <type/> classifies the <text/>:
 

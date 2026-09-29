@@ -115,7 +115,9 @@ export default class TaskBoardCommand {
                     return
                 }
 
-                /*  run the interactive terminal board  */
+                /*  run the interactive terminal board, with the production build of React
+                    (its development build records a never cleared performance measure per render)  */
+                process.env.NODE_ENV ??= "production"
                 const { runTUI } = await import("./ase-task-board-tui.js")
                 await runTUI(this.log)
             })

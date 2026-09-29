@@ -68,6 +68,13 @@ ChangeLog
     or collapse a group, and `SPACE` to pick up and drop a task onto another lane (cancelled via
     `ESC`).
 
+-   IMPROVEMENT [plugin]: Batch grilling in `ase-task-grill`
+    `ase-task-grill` now grills like `ase-code-edit --grill`: all questions of a round in one
+    `QUESTION`/`ANSWERS` table (sorted by focus area, impact, and dependencies), answered by one
+    combined reply with `nX` short responses, where unaddressed questions accept their `⚑` answer.
+    Every round saves the plan and closes with a `PLAN CHANGES` box; cancelling discards only the
+    current round. The shared round procedure moved into `ase-common-grill.md`.
+
 -   FEATURE [plugin]: Clickable grilling table
     In the latest grilling table redrawn by the function hooks module `ase-mods.ts`, every
     question and every answer alternative reveals a clickable button while hovered (rendered in
