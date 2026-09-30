@@ -1,17 +1,17 @@
 
 ##  NAME
 
-`ase-meta-review` - Review Staged Changes
+`ase-repo-review` - Review Staged Changes
 
 ##  SYNOPSIS
 
-`ase-meta-review`
+`ase-repo-review`
     [`--help`|`-h`]
     [`--severity`|`-S`=(`LOW`|`MEDIUM`|`HIGH`)]
 
 ##  DESCRIPTION
 
-The `ase-meta-review` skill performs a *holistic*,
+The `ase-repo-review` skill performs a *holistic*,
 *human-reviewer-style* critique of the *staged* Git changes and emits a
 single *approve* / *reject* **verdict** backed by *prioritized*,
 *severity-tagged*, *line-cited* **findings**. Rather than scanning the
@@ -40,17 +40,17 @@ Each finding carries a *severity* - **HIGH**, **MEDIUM**, **LOW**, or
 documented priority conflict) - and is *evidence-grounded*: it cites the
 exact `file:line` location it stems from. The overall verdict is
 **REJECT - DEMANDS CHANGES** when any *HIGH* finding remains, and
-**APPROVE** otherwise. The work is performed by a dedicated `ase-meta-review`
+**APPROVE** otherwise. The work is performed by a dedicated `ase-repo-review`
 sub-agent so that the silent reading and read-only repository probing
 never leak into the transcript; only the structured verdict and findings
 are rendered.
 
 The skill *complements* rather than duplicates its neighbors:
 `ase-code-lint` flags *mechanical* code-quality issues, `ase-code-analyze`
-inspects *logic and semantics*, `ase-meta-diff` narrates *what changed*
+inspects *logic and semantics*, `ase-repo-diff` narrates *what changed*
 (with optional coherence, risk, and blast-radius reports), and
 `ase-meta-diaboli` *adversarially challenges a thesis* - whereas
-`ase-meta-review` renders a *reviewer's judgment* on a concrete diff
+`ase-repo-review` renders a *reviewer's judgment* on a concrete diff
 before it is committed.
 
 ##  OPTIONS
@@ -66,7 +66,7 @@ before it is committed.
 
 ##  ARGUMENTS
 
-The `ase-meta-review` skill takes no positional arguments; it always
+The `ase-repo-review` skill takes no positional arguments; it always
 reviews the currently *staged* Git changes.
 
 ##  SCENARIOS
@@ -81,16 +81,16 @@ reviews the currently *staged* Git changes.
 Review the currently staged changes before committing:
 
 ```text
-❯ /ase-meta-review
+❯ /ase-repo-review
 ```
 
 Review the staged changes, reporting only `MEDIUM` and `HIGH` findings:
 
 ```text
-❯ /ase-meta-review -S MEDIUM
+❯ /ase-repo-review -S MEDIUM
 ```
 
 ##  SEE ALSO
 
-[`ase-meta-diff`](../ase-meta-diff/help.md), [`ase-meta-commit`](../ase-meta-commit/help.md), [`ase-code-lint`](../ase-code-lint/help.md), [`ase-code-analyze`](../ase-code-analyze/help.md),
+[`ase-repo-diff`](../ase-repo-diff/help.md), [`ase-repo-commit`](../ase-repo-commit/help.md), [`ase-code-lint`](../ase-code-lint/help.md), [`ase-code-analyze`](../ase-code-analyze/help.md),
 [`ase-meta-diaboli`](../ase-meta-diaboli/help.md).

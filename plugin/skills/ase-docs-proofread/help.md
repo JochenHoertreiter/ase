@@ -69,4 +69,4 @@ Proofread an entire documentation directory automatically:
 
 ##  SEE ALSO
 
-[`ase-docs-shorten`](../ase-docs-shorten/help.md), [`ase-docs-refine`](../ase-docs-refine/help.md), [`ase-docs-distill`](../ase-docs-distill/help.md), [`ase-code-lint`](../ase-code-lint/help.md), [`ase-meta-changelog`](../ase-meta-changelog/help.md).
+[`ase-docs-shorten`](../ase-docs-shorten/help.md), [`ase-docs-refine`](../ase-docs-refine/help.md), [`ase-docs-distill`](../ase-docs-distill/help.md), [`ase-code-lint`](../ase-code-lint/help.md), [`ase-repo-changelog`](../ase-repo-changelog/help.md).

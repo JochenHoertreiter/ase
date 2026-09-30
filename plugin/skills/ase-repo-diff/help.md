@@ -1,11 +1,11 @@
 
 ##  NAME
 
-`ase-meta-diff` - Summarize Diff
+`ase-repo-diff` - Summarize Diff
 
 ##  SYNOPSIS
 
-`ase-meta-diff`
+`ase-repo-diff`
     [`--help`|`-h`]
     [`--coherence`|`-c`]
     [`--risk`|`-r`]
@@ -13,7 +13,7 @@
 
 ##  DESCRIPTION
 
-The `ase-meta-diff` skill turns a raw Git diff into a *concise*,
+The `ase-repo-diff` skill turns a raw Git diff into a *concise*,
 *human-readable* narrative of what changed and why, *grouped by
 intent* (such as *Feature*, *Improvement*, *Bugfix*, *Update*,
 *Cleanup*, or *Refactor*) rather than by file. It inspects the
@@ -85,27 +85,27 @@ giving a visual sense of *what a diff endangers* before a deeper review.
 Summarize the currently staged changes:
 
 ```text
-❯ /ase-meta-diff
+❯ /ase-repo-diff
 ```
 
 Summarize the staged changes and append an intent-coherence report:
 
 ```text
-❯ /ase-meta-diff --coherence
+❯ /ase-repo-diff --coherence
 ```
 
 Summarize the staged changes and append a graded risk report:
 
 ```text
-❯ /ase-meta-diff --risk
+❯ /ase-repo-diff --risk
 ```
 
 Summarize the staged changes and append a blast-radius map:
 
 ```text
-❯ /ase-meta-diff --blast
+❯ /ase-repo-diff --blast
 ```
 
 ##  SEE ALSO
 
-[`ase-meta-commit`](../ase-meta-commit/help.md), [`ase-meta-changelog`](../ase-meta-changelog/help.md), [`ase-arch-analyze`](../ase-arch-analyze/help.md).
+[`ase-repo-commit`](../ase-repo-commit/help.md), [`ase-repo-changelog`](../ase-repo-changelog/help.md), [`ase-arch-analyze`](../ase-arch-analyze/help.md).

@@ -5,6 +5,22 @@ ChangeLog
 1.1.0 (2026-09-XX)
 ------------------
 
+-   FEATURE [plugin]: Branch Merging
+    The new `ase-repo-merge` skill merges a source branch, including its uncommitted
+    changes, into a target branch -- through a merge commit, a rebase with fast-forward, or a
+    squash commit (`--mode merge|rebase|squash`) --, resolves merge conflicts semantically (aborting the
+    merge on unresolvable ones), checks that the source branch landed, and emits the
+    verdict `MERGED`, `CONFLICT`, or `FAILED`.
+
+-   FEATURE [plugin]: Conflict Resolution
+    The new `ase-repo-resolve` skill resolves the conflicts of an in-progress merge, rebase,
+    cherry-pick, revert, or stash apply, or the conflict markers left by `patch`, semantically
+    and without losing any change (backups and a per-hunk change preservation check), keeps
+    and escalates unresolvable hunks as-is (or lets the user decide them under `--interactive`),
+    continues the in-progress operation, and emits the verdict `RESOLVED`, `PARTIAL`, `NONE`,
+    or `FAILED`. The resolution procedure is shared with `ase-repo-merge` via the new
+    `ase-common-resolve.md` meta file.
+
 -   FEATURE [tool]: GitHub Issues task store
     The new built-in storage plugin `github` persists the task plans as the issues of a GitHub
     repository, selected either by `ase task store start --module github` (with the repositories
@@ -16,6 +32,12 @@ ChangeLog
     all other header keys as `ase:<key>:<value>` labels. Deleting a task closes its issue as "not
     planned". Issue changes made on GitHub are detected by conditional polling (ETag and `since`)
     and delivered as task store events through the new optional storage plugin method `watch`.
+
+-   CHANGE [plugin,pages]: New `ase-repo-*` skill family
+    Rename the Git repository related skills `ase-meta-review`, `ase-meta-diff`,
+    `ase-meta-changelog`, `ase-meta-commit`, and `ase-code-dissect` to `ase-repo-review`,
+    `ase-repo-diff`, `ase-repo-changelog`, `ase-repo-commit`, and `ase-repo-dissect`, and the
+    `ase-meta-review` sub-agent to `ase-repo-review`.
 
 -   FEATURE [tool,plugin]: Task id schemes
     The new `project.task.idscheme` configuration (`ase task idscheme`) selects the scheme of new
@@ -185,6 +207,13 @@ ChangeLog
     `~/.local/state/ase`) on Linux. Additionally, a `.ase` directory in the home directory no longer
     makes the home directory a project root. A stale `~/.ase` can be removed.
 
+-   IMPROVEMENT [tool]: Lazy loading of the CLI command modules
+    The `ase` CLI no longer imports the modules of all top-level commands at startup, but only
+    the module of the actually addressed command (plus those of its addressed sub-commands),
+    determined by scanning the command line before parsing it (a help request or an unknown
+    command still loads all of them, for the complete command overview). A plain `ase -V` this
+    way loads 15 instead of 2337 modules, so the startup overhead of about three seconds is gone.
+
 -   BUGFIX [plugin]: Task plan kind `SPECIFYING` honored
     `ase-task-preflight` and `ase-task-implement` now recognize the `Kind: SPECIFYING`
     frontmatter key of a task plan and internalize the SPECIFYING TENETS, and also infer
@@ -194,6 +223,12 @@ ChangeLog
     The pre-tool-use hook now derives the tool arguments from the *received* value shape
     instead of a per-tool declaration, so the object-shaped `toolArgs` of the GitHub Copilot
     CLI is parsed again and its `bash`, `Skill`, `Read`, and `Edit` auto-approvals work.
+
+-   BUGFIX [infr]: Windows-portable plugin `build` target
+    Replaced the Unix-only `build` task body of `plugin/etc/stx.conf` (`ls`, `grep`, `sed`, a
+    `for`/`$(...)` subshell) with an embedded Node.js script (`{js}`, as already used by
+    `lint-types`), so generating `skills/ase-help-intent/data.md` and
+    `meta/ase-format-specbook.{md,yaml}` also works on Windows.
 
 1.0.6 (2026-09-14)
 ------------------

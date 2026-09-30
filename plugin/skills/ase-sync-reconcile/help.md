@@ -134,5 +134,5 @@ specification as a unified diff, without applying it:
 
 ##  SEE ALSO
 
-[`ase-meta-changelog`](../ase-meta-changelog/help.md),
+[`ase-repo-changelog`](../ase-repo-changelog/help.md),
 [`ase-task-implement`](../ase-task-implement/help.md).

@@ -1,11 +1,11 @@
 
 ##  NAME
 
-`ase-code-dissect` - Dissect a Change Set
+`ase-repo-dissect` - Dissect a Change Set
 
 ##  SYNOPSIS
 
-`ase-code-dissect`
+`ase-repo-dissect`
     [`--help`|`-h`]
     [`--max-parts`|`-m` *count*]
     [`--staged`|`-s`]
@@ -15,7 +15,7 @@
 
 ##  DESCRIPTION
 
-The `ase-code-dissect` skill treats the current Git change set as an
+The `ase-repo-dissect` skill treats the current Git change set as an
 *epic* and *dissects* it domain-wise and logically into *cohesive
 parts*. Each part is a self-contained unit of change with a single
 coherent purpose, so it can be reviewed and committed *atomically* and
@@ -101,28 +101,28 @@ from the *current* project id and the per-part feature slug.
 Dissect the current working copy changes:
 
 ```text
-❯ /ase-code-dissect
+❯ /ase-repo-dissect
 ```
 
 Preview the dissection of the staged changes into at most four parts:
 
 ```text
-❯ /ase-code-dissect --staged --dry --max-parts 4
+❯ /ase-repo-dissect --staged --dry --max-parts 4
 ```
 
 Re-dissect the changes, re-creating the previously created worktrees:
 
 ```text
-❯ /ase-code-dissect --force
+❯ /ase-repo-dissect --force
 ```
 
 Dissect the changes along an explicitly given axis:
 
 ```text
-❯ /ase-code-dissect keep the plugin and tool changes in separate parts
+❯ /ase-repo-dissect keep the plugin and tool changes in separate parts
 ```
 
 ##  SEE ALSO
 
-[`ase-task-dissect`](../ase-task-dissect/help.md), [`ase-meta-diff`](../ase-meta-diff/help.md), [`ase-meta-review`](../ase-meta-review/help.md),
-[`ase-meta-changelog`](../ase-meta-changelog/help.md), [`ase-meta-commit`](../ase-meta-commit/help.md).
+[`ase-task-dissect`](../ase-task-dissect/help.md), [`ase-repo-diff`](../ase-repo-diff/help.md), [`ase-repo-review`](../ase-repo-review/help.md),
+[`ase-repo-changelog`](../ase-repo-changelog/help.md), [`ase-repo-commit`](../ase-repo-commit/help.md).

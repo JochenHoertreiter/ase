@@ -1,5 +1,5 @@
 ---
-name: ase-code-dissect
+name: ase-repo-dissect
 argument-hint: "[--help|-h] [--max-parts|-m <count>] [--staged|-s] [--dry|-d] [--force|-f] [<dissect-hint>]"
 description: >
     Dissect the current Git change set, treated as an epic, domain-wise
@@ -22,12 +22,12 @@ allowed-tools:
 @${CLAUDE_SKILL_DIR}/../../meta/ase-skill.md
 @${CLAUDE_SKILL_DIR}/../../meta/ase-getopt.md
 
-<purpose name="ase-code-dissect">
+<purpose name="ase-repo-dissect">
 Dissect a Change Set
 </purpose>
 
 <expand name="getopt"
-    arg1="ase-code-dissect"
+    arg1="ase-repo-dissect"
     arg2="--max-parts|-m=8 --staged|-s --dry|-d --force|-f">
     $ARGUMENTS
 </expand>
@@ -58,7 +58,7 @@ Procedure
         Only output the following <template/>:
 
         <template>
-        ⧉ **ASE**: ✪ skill: **ase-code-dissect**, ⇌ hint: **<dissect-hint/>**
+        ⧉ **ASE**: ✪ skill: **ase-repo-dissect**, ⇌ hint: **<dissect-hint/>**
         </template>
         </if>
         <else>
@@ -115,7 +115,7 @@ Procedure
         the following <template/>, then continue with the next file:
 
         <template>
-        ⧉ **ASE**: ✪ skill: **ase-code-dissect**, ⊘ untracked: `<file/>`, ▶ status: **not foldable into the change set**
+        ⧉ **ASE**: ✪ skill: **ase-repo-dissect**, ⊘ untracked: `<file/>`, ▶ status: **not foldable into the change set**
         </template>
         </if>
         <else>
@@ -128,7 +128,7 @@ Procedure
         Only output the following <template/> and then *STOP* immediately:
 
         <template>
-        ⧉ **ASE**: ✪ skill: **ase-code-dissect**, ▶ status: **no changes to dissect**
+        ⧉ **ASE**: ✪ skill: **ase-repo-dissect**, ▶ status: **no changes to dissect**
         </template>
         </if>
 
@@ -140,7 +140,7 @@ Procedure
 
         <expand
             name="dissect-derive"
-            arg1="ase-code-dissect"
+            arg1="ase-repo-dissect"
             arg2="<dissect-hint/>"
             arg3="<ase-project-id/>"
         >
@@ -186,7 +186,7 @@ Procedure
         *all* existing worktrees and branches untouched:
 
         <template>
-        ⧉ **ASE**: ✪ skill: **ase-code-dissect**, ▶ ERROR: unsafe worktree directory -- cannot create worktrees
+        ⧉ **ASE**: ✪ skill: **ase-repo-dissect**, ▶ ERROR: unsafe worktree directory -- cannot create worktrees
         </template>
         </if>
 
@@ -209,8 +209,8 @@ Procedure
         *all* existing worktrees and branches untouched:
 
         <template>
-        ⧉ **ASE**: ✪ skill: **ase-code-dissect**, ⊘ collisions: <collisions/>
-        ⧉ **ASE**: ✪ skill: **ase-code-dissect**, ✪ dissection: **<n/>** parts, ▶ status: **targets exist**
+        ⧉ **ASE**: ✪ skill: **ase-repo-dissect**, ⊘ collisions: <collisions/>
+        ⧉ **ASE**: ✪ skill: **ase-repo-dissect**, ✪ dissection: **<n/>** parts, ▶ status: **targets exist**
         </template>
 
         Directly *after* this <template/>, and *before* stopping, give
@@ -219,7 +219,7 @@ Procedure
         and hence emit no output at all):
 
         <ase-tpl-hint level="minimal">
-        Re-run `/ase-code-dissect --force` to remove and re-create the colliding worktrees and branches.
+        Re-run `/ase-repo-dissect --force` to remove and re-create the colliding worktrees and branches.
         </ase-tpl-hint>
         </if>
 
@@ -284,7 +284,7 @@ Procedure
             remaining ones:
 
             <template>
-            ⧉ **ASE**: ✪ skill: **ase-code-dissect**, ◉ part: **<part-id/>**, ▶ status: **worktree failed to create**
+            ⧉ **ASE**: ✪ skill: **ase-repo-dissect**, ◉ part: **<part-id/>**, ▶ status: **worktree failed to create**
             </template>
             </if>
 
@@ -299,7 +299,7 @@ Procedure
             remaining ones:
 
             <template>
-            ⧉ **ASE**: ✪ skill: **ase-code-dissect**, ◉ part: **<part-id/>**, ▶ status: **patch failed to apply**
+            ⧉ **ASE**: ✪ skill: **ase-repo-dissect**, ◉ part: **<part-id/>**, ▶ status: **patch failed to apply**
             </template>
             </if>
 
@@ -336,7 +336,7 @@ Procedure
         7.  Only output the following <template/>:
 
             <template>
-            ⧉ **ASE**: ✪ skill: **ase-code-dissect**, ◉ part: **<part-id/>**, ▶ status: **worktree created**
+            ⧉ **ASE**: ✪ skill: **ase-repo-dissect**, ◉ part: **<part-id/>**, ▶ status: **worktree created**
             </template>
 
     3.  *Clean up* the temporary patch files by running the
@@ -362,14 +362,14 @@ Procedure
         Only output the following <template/>:
 
         <template>
-        ⧉ **ASE**: ✪ skill: **ase-code-dissect**, ✪ dissection: **<n/>** parts, ▶ status: **dry-run -- no worktrees created**
+        ⧉ **ASE**: ✪ skill: **ase-repo-dissect**, ✪ dissection: **<n/>** parts, ▶ status: **dry-run -- no worktrees created**
         </template>
         </if>
         <else>
         Only output the following <template/>:
 
         <template>
-        ⧉ **ASE**: ✪ skill: **ase-code-dissect**, ✪ dissection: **<n/>** parts, ▶ status: **change set dissected**
+        ⧉ **ASE**: ✪ skill: **ase-repo-dissect**, ✪ dissection: **<n/>** parts, ▶ status: **change set dissected**
         </template>
         </else>
 
@@ -384,16 +384,16 @@ Procedure
         </if>
         <else>
         <ase-tpl-hint level="minimal">
-        Re-run `/ase-code-dissect` without `--dry` to actually create the reported worktrees, optionally with a `<dissect-hint>` argument if the reported split is not the intended one.
+        Re-run `/ase-repo-dissect` without `--dry` to actually create the reported worktrees, optionally with a `<dissect-hint>` argument if the reported split is not the intended one.
         </ase-tpl-hint>
         </else>
 
         <ase-tpl-hint level="normal">
-        Use `/ase-meta-diff` and `/ase-meta-review` inside a part's worktree to summarize and review it before committing.
+        Use `/ase-repo-diff` and `/ase-repo-review` inside a part's worktree to summarize and review it before committing.
         </ase-tpl-hint>
 
         <ase-tpl-hint level="verbose">
-        Use `/ase-code-dissect --staged` to dissect the staged changes only, `--max-parts <count>` to bound the number of parts, `--force` to re-create already existing worktrees, and a `<dissect-hint>` argument to steer the split.
+        Use `/ase-repo-dissect --staged` to dissect the staged changes only, `--max-parts <count>` to bound the number of parts, `--force` to re-create already existing worktrees, and a `<dissect-hint>` argument to steer the split.
         </ase-tpl-hint>
 
     </step>

@@ -74,13 +74,13 @@ The following ASE commands/skills exist on the meta-level:
   pyramid-structured `journalist`, a very brief, factual, and abbreviating
   `telegrapher`, or an ultra brief, rough and stuttering `caveman`.
 
-- **/ase-meta-changelog**:<br/>
+- **/ase-repo-changelog**:<br/>
   Update ChangeLog entries in `CHANGELOG.md` files from Git commit information.
 
-- **/ase-meta-commit**:<br/>
+- **/ase-repo-commit**:<br/>
   Determine commit message for staged Git changes.
 
-- **/ase-meta-diff** \[`--coherence`|`-c`\] \[`--risk`|`-r`\] \[`--blast`|`-b`\]:<br/>
+- **/ase-repo-diff** \[`--coherence`|`-c`\] \[`--risk`|`-r`\] \[`--blast`|`-b`\]:<br/>
   Summarize the staged Git changes as a human-readable, intent-grouped
   narrative. With `--coherence`, additionally reconstruct the single
   intended change and flag hunks that do not serve it. With `--risk`,
@@ -89,11 +89,36 @@ The following ASE commands/skills exist on the meta-level:
   risk report with mitigations. With `--blast`, additionally render a
   blast-radius map of the touched modules and their reverse dependencies.
 
-- **/ase-meta-review** \[`--severity`|`-S` `LOW`|`MEDIUM`|`HIGH`\]:<br/>
+- **/ase-repo-review** \[`--severity`|`-S` `LOW`|`MEDIUM`|`HIGH`\]:<br/>
   Perform a holistic, human-reviewer-style critique of the currently
   staged Git changes and emit an approve/reject verdict with
   prioritized, severity-tagged, line-cited findings. `--severity` sets
   the minimum severity of findings to report.
+
+- **/ase-repo-merge** \[`--target`|`-t` *branch*\] \[`--mode`|`-m` `merge`|`rebase`|`squash`\] \[`--cleanup`|`-c`\] *source-branch*:<br/>
+  Merge the *source-branch*, after committing its still uncommitted
+  changes, into the target branch of `--target` (default: `current`, the
+  checked-out branch) through a merge commit (`--mode merge`, default),
+  a rebase with fast-forward (`--mode rebase`), or a squash commit
+  (`--mode squash`), resolve merge conflicts semantically like
+  `ase-repo-resolve` (aborting the merge on unresolvable ones), check
+  that the source branch landed, and emit the verdict `MERGED`,
+  `CONFLICT`, or `FAILED` (on the latter two, the commit of the
+  uncommitted changes is undone). `--cleanup` removes the worktree and
+  the branch of the source after a successful merge.
+
+- **/ase-repo-resolve** \[`--dir`|`-d` *dir*\] \[`--safe`|`-s`\] \[`--interactive`|`-i`\] \[*path* ...\]:<br/>
+  Resolve the conflicts of the working directory *dir* (default: `.`)
+  -- of an in-progress merge, rebase, cherry-pick, revert, or stash
+  apply, or conflict markers left by `patch` -- semantically and
+  without losing any change: every touched file is backed up, every
+  resolved hunk is checked to preserve the changes of both sides, and
+  unresolvable hunks are kept as-is and escalated. Fully resolved files
+  are staged, the in-progress operation is continued, and the verdict
+  `RESOLVED`, `PARTIAL`, `NONE`, or `FAILED` is emitted. `--safe` never
+  touches non-content (binary, submodule, modify/delete, rename)
+  conflicts, `--interactive` lets the user decide unresolvable hunks,
+  and *path* arguments restrict the resolved files.
 
 - **/ase-meta-mint** \[`--type`|`-t` `uuid`|`sha1`|`const`|`var`|`class`|`func`|`path`|`name`\] \[`--count`|`-c` *count*\] \[*hint*\]:<br/>
   Mint an identifier or a name of the requested type out of a free-text

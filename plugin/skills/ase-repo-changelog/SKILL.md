@@ -1,5 +1,5 @@
 ---
-name: ase-meta-changelog
+name: ase-repo-changelog
 argument-hint: "[--help|-h]"
 description: >
     Update ChangeLog entries in CHANGELOG.md files
@@ -21,11 +21,11 @@ allowed-tools:
 @${CLAUDE_SKILL_DIR}/../../meta/ase-skill.md
 @${CLAUDE_SKILL_DIR}/../../meta/ase-getopt.md
 
-<purpose name="ase-meta-changelog">
+<purpose name="ase-repo-changelog">
 Update ChangeLog Entries
 </purpose>
 
-<expand name="getopt" arg1="ase-meta-changelog">
+<expand name="getopt" arg1="ase-repo-changelog">
     $ARGUMENTS
 </expand>
 

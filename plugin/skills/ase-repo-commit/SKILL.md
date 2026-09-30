@@ -1,5 +1,5 @@
 ---
-name: ase-meta-commit
+name: ase-repo-commit
 argument-hint: "[--help|-h]"
 description: >
     Determine commit message for staged Git changes.
@@ -15,11 +15,11 @@ allowed-tools:
 @${CLAUDE_SKILL_DIR}/../../meta/ase-skill.md
 @${CLAUDE_SKILL_DIR}/../../meta/ase-getopt.md
 
-<purpose name="ase-meta-commit">
+<purpose name="ase-repo-commit">
 Git Commit
 </purpose>
 
-<expand name="getopt" arg1="ase-meta-commit">
+<expand name="getopt" arg1="ase-repo-commit">
     $ARGUMENTS
 </expand>
 
@@ -42,7 +42,7 @@ currently staged Git changes.
     Only output the following <template/> and then *STOP* immediately:
 
     <template>
-    ⧉ **ASE**: ✪ skill: **ase-meta-commit**, ▶ status: **no changes to commit**
+    ⧉ **ASE**: ✪ skill: **ase-repo-commit**, ▶ status: **no changes to commit**
     </template>
     </if>
 
@@ -55,7 +55,7 @@ currently staged Git changes.
     `<type/>: <summary/>`
 
     The known <type/>s (kept deliberately in sync with the intent groups
-    of the `ase-meta-diff` and `ase-meta-changelog` skills) and their
+    of the `ase-repo-diff` and `ase-repo-changelog` skills) and their
     usual corresponding kind of change are:
 
     -   `FEATURE`:     new        functionality or configuration
@@ -90,7 +90,7 @@ currently staged Git changes.
         sub-package) and is *not* itself part of the staged changes
     ">
     <ase-tpl-hint level="normal">
-    The staged changes do not touch `CHANGELOG.md` -- use `/ase-meta-changelog` to update its entries before committing.
+    The staged changes do not touch `CHANGELOG.md` -- use `/ase-repo-changelog` to update its entries before committing.
     </ase-tpl-hint>
     </if>
 

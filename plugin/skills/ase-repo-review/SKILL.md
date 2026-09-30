@@ -1,5 +1,5 @@
 ---
-name: ase-meta-review
+name: ase-repo-review
 argument-hint: "[--help|-h] [--severity|-S=(LOW|MEDIUM|HIGH)]"
 description: >
     Perform a holistic, human-reviewer-style critique of the currently
@@ -19,12 +19,12 @@ allowed-tools:
 @${CLAUDE_SKILL_DIR}/../../meta/ase-skill.md
 @${CLAUDE_SKILL_DIR}/../../meta/ase-getopt.md
 
-<purpose name="ase-meta-review">
+<purpose name="ase-repo-review">
 Review Staged Changes
 </purpose>
 
 <expand name="getopt"
-    arg1="ase-meta-review"
+    arg1="ase-repo-review"
     arg2="--severity|-S=(LOW|MEDIUM|HIGH)">
     $ARGUMENTS
 </expand>
@@ -37,7 +37,7 @@ and *project-convention conformance* - and emit a single *approve /
 request-changes verdict* backed by *prioritized*, *severity-tagged*,
 *line-cited* findings. This is a *synthesizing critique*, not a mechanical
 scan: it complements `ase-code-lint` (mechanical quality), `ase-code-analyze`
-(logic/semantics), and `ase-meta-diff` (intent narrative and risk).
+(logic/semantics), and `ase-repo-diff` (intent narrative and risk).
 </objective>
 
 Procedure
@@ -59,7 +59,7 @@ Procedure
         Only output the following <template/> and then *STOP* immediately:
 
         <template>
-        ⧉ **ASE**: ✪ skill: **ase-meta-review**, ▶ status: **no changes to review**
+        ⧉ **ASE**: ✪ skill: **ase-repo-review**, ▶ status: **no changes to review**
         </template>
         </if>
 
@@ -97,7 +97,7 @@ Procedure
     ```text
         Agent(
             description:       "Review Investigation",
-            subagent_type:     "ase:ase-meta-review",
+            subagent_type:     "ase:ase-repo-review",
             prompt:            "Review the staged changes.",
             run_in_background: false
         )

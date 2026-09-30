@@ -1,5 +1,5 @@
 ---
-name: ase-meta-diff
+name: ase-repo-diff
 argument-hint: "[--help|-h] [--coherence|-c] [--risk|-r] [--blast|-b]"
 description: >
     Summarize the currently staged Git changes as a human-readable,
@@ -21,12 +21,12 @@ allowed-tools:
 @${CLAUDE_SKILL_DIR}/../../meta/ase-skill.md
 @${CLAUDE_SKILL_DIR}/../../meta/ase-getopt.md
 
-<purpose name="ase-meta-diff">
+<purpose name="ase-repo-diff">
 Summarize Diff
 </purpose>
 
 <expand name="getopt"
-    arg1="ase-meta-diff"
+    arg1="ase-repo-diff"
     arg2="--coherence|-c --risk|-r --blast|-b">
     $ARGUMENTS
 </expand>
@@ -68,7 +68,7 @@ Procedure
         Only output the following <template/> and then *STOP* immediately:
 
         <template>
-        ⧉ **ASE**: ✪ skill: **ase-meta-diff**, ▶ status: **no changes to summarize**
+        ⧉ **ASE**: ✪ skill: **ase-repo-diff**, ▶ status: **no changes to summarize**
         </template>
         </if>
 
@@ -361,7 +361,7 @@ Procedure
     into nothing and hence emit no output at all):
 
     <ase-tpl-hint level="normal">
-    For a human-reviewer-style critique of the very same staged changes, with an approve/reject verdict, use `/ase-meta-review`.
+    For a human-reviewer-style critique of the very same staged changes, with an approve/reject verdict, use `/ase-repo-review`.
     </ase-tpl-hint>
 
     <if condition="
@@ -370,7 +370,7 @@ Procedure
         <getopt-option-blast/> is not equal `true`
     ">
     <ase-tpl-hint level="verbose">
-    Use `/ase-meta-diff --coherence --risk --blast` to additionally scrutinize the intent coherence, the risk profile, and the blast radius of the staged changes.
+    Use `/ase-repo-diff --coherence --risk --blast` to additionally scrutinize the intent coherence, the risk profile, and the blast radius of the staged changes.
     </ase-tpl-hint>
     </if>
 

@@ -176,7 +176,7 @@ export const highlights: Highlight[] = [
         body:    "Keep your <code>CHANGELOG.md</code> file current without the chore: derive concise, " +
                  "human-readable changelog entries straight from your Git history and " +
                  "fold them into the existing file under the right version and category.",
-        skill:   "/ase-meta-changelog",
+        skill:   "/ase-repo-changelog",
         video:   "ase-meta-changelog"
     }
 ]

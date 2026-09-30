@@ -41,7 +41,7 @@ export default class SetupCommand {
         this.log.write("info", `setup: install${dev ? "[dev]" : ""}: ` +
             `installing ASE ${spec.label} plugin (origin: ${dev ? "local" : "remote/bundled"})`)
         const pkgdir  = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..")
-        const source  = dev ? path.resolve(pkgdir, "..") : pkgdir
+        const source  = !dev ? pkgdir : (process.env.ASE_SETUP_DEV_BASEDIR ?? path.resolve(pkgdir, ".."))
         const scopeArgs = tool === "claude" && scope !== "user" ? [ "--scope", scope ] : []
         await this.runner.run(spec.cli, [ "plugin", "marketplace", "add", source, ...scopeArgs ])
         await this.runner.run(spec.cli, [ "plugin", spec.pInstall, "ase@ase", ...scopeArgs ], { retries: 3 })
@@ -70,7 +70,9 @@ export default class SetupCommand {
             /*  update ASE CLI Tool  */
             this.log.write("info", `setup: update[dev]: used ASE version: ${Version.current()}`)
             this.log.write("info", "setup: update[dev]: re-build ASE CLI tool (origin: local)")
-            const tooldir = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..")
+            const pkgdir  = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..")
+            const tooldir = process.env.ASE_SETUP_DEV_BASEDIR !== undefined ?
+                path.join(process.env.ASE_SETUP_DEV_BASEDIR, "tool") : pkgdir
             await this.runner.run("npm", [ "install" ], { cwd: tooldir })
             await this.runner.run("npm", [ "start", "build" ], { cwd: tooldir })
 

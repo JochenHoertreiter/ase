@@ -120,5 +120,5 @@ Dissect a specific task plan with a hint:
 
 ##  SEE ALSO
 
-[`ase-code-dissect`](../ase-code-dissect/help.md), [`ase-task-edit`](../ase-task-edit/help.md), [`ase-task-condense`](../ase-task-condense/help.md),
+[`ase-repo-dissect`](../ase-repo-dissect/help.md), [`ase-task-edit`](../ase-task-edit/help.md), [`ase-task-condense`](../ase-task-condense/help.md),
 [`ase-task-implement`](../ase-task-implement/help.md), [`ase-task-list`](../ase-task-list/help.md), [`ase-task-delete`](../ase-task-delete/help.md).

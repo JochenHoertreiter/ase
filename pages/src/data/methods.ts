@@ -77,17 +77,17 @@ export const methods: Method[] = [
     { icon: Grid2x2,             name: "2x2 Matrix",               note: "sort along two dimensions", skill: "ase-meta-quotes"     },
     { icon: ArrowUpDown,         name: "Ladder of Abstraction",    note: "move up and down topics",   skill: "ase-meta-proximity"  },
     { icon: Split,               name: "Divide & Conquer",         note: "split an epic into parts",  skill: "ase-task-dissect"    },
-    { icon: GitCommitHorizontal, name: "Atomic Commits",           note: "one purpose per commit",    skill: "ase-code-dissect"    },
+    { icon: GitCommitHorizontal, name: "Atomic Commits",           note: "one purpose per commit",    skill: "ase-repo-dissect"    },
     { icon: FlaskConical,        name: "Dry Run",                  note: "rehearse before applying",  skill: "ase-task-preflight"  },
-    { icon: Gavel,               name: "Peer Review",              note: "judge diff before merge",   skill: "ase-meta-review"     },
+    { icon: Gavel,               name: "Peer Review",              note: "judge diff before merge",   skill: "ase-repo-review"     },
     { icon: RefreshCw,           name: "Round-Trip Engineering",   note: "keep artifacts in sync",    skill: "ase-sync-reconcile"  },
-    { icon: Bomb,                name: "Blast Radius",             note: "see what a change hits",    skill: "ase-meta-diff"       },
+    { icon: Bomb,                name: "Blast Radius",             note: "see what a change hits",    skill: "ase-repo-diff"       },
     { icon: ShoppingCart,        name: "Make-or-Buy",              note: "reuse or roll your own",    skill: "ase-arch-discover"   },
     { icon: Target,              name: "Single Responsibility",    note: "one reason to change",      skill: "ase-code-craft"      },
     { icon: ScanSearch,          name: "Code Smells",              note: "spot known bad patterns",   skill: "ase-code-lint"       },
     { icon: TrendingUp,          name: "Big-O Analysis",           note: "cost of an algorithm",      skill: "ase-code-analyze"    },
     { icon: Flame,               name: "Code Churn",               note: "find the busiest files",    skill: "ase-code-insight"    },
     { icon: NotebookPen,         name: "Decision Records",         note: "capture the why",           skill: "ase-sync-reconcile"  },
-    { icon: Tag,                 name: "Conventional Changes",     note: "standard commit log entry", skill: "ase-meta-changelog"  }
+    { icon: Tag,                 name: "Conventional Changes",     note: "standard commit log entry", skill: "ase-repo-changelog"  }
 ]
 

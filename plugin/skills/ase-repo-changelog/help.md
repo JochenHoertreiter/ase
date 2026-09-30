@@ -1,16 +1,16 @@
 
 ##  NAME
 
-`ase-meta-changelog` - Update ChangeLog Entries
+`ase-repo-changelog` - Update ChangeLog Entries
 
 ##  SYNOPSIS
 
-`ase-meta-changelog`
+`ase-repo-changelog`
     [`--help`|`-h`]
 
 ##  DESCRIPTION
 
-The `ase-meta-changelog` skill helps to *complete*, *consolidate*, and
+The `ase-repo-changelog` skill helps to *complete*, *consolidate*, and
 *sort* the entries of the most recent section of a `CHANGELOG.md`
 file, based on the underlying *Git* commits and the currently staged
 changes in the Git *index*.
@@ -34,9 +34,9 @@ date.
 Update the most recent ChangeLog section:
 
 ```text
-❯ /ase-meta-changelog
+❯ /ase-repo-changelog
 ```
 
 ##  SEE ALSO
 
-[`ase-meta-commit`](../ase-meta-commit/help.md), [`ase-docs-proofread`](../ase-docs-proofread/help.md).
+[`ase-repo-commit`](../ase-repo-commit/help.md), [`ase-docs-proofread`](../ase-docs-proofread/help.md).

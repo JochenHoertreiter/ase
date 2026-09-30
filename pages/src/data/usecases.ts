@@ -297,7 +297,7 @@ export const useCases: UseCase[] = [
                 body:     "The uncommitted changes found in the working copy are decomposed into " +
                           "cohesive parts — as a dry run, so nothing is materialized yet.",
                 commands: [
-                    "**/ase-code-dissect** --dry --max-parts 4"
+                    "**/ase-repo-dissect** --dry --max-parts 4"
                 ]
             },
             {
@@ -784,7 +784,7 @@ export const useCases: UseCase[] = [
                 body:     "The staged diff is retold as an intent-grouped narrative with a coherence " +
                           "check, which is where a behavior change smuggled into a refactoring shows up.",
                 commands: [
-                    "**/ase-meta-diff** --coherence --risk"
+                    "**/ase-repo-diff** --coherence --risk"
                 ]
             },
             {
@@ -871,7 +871,7 @@ export const useCases: UseCase[] = [
                 body:     "The staged changes are retold as an intent-grouped narrative, together with " +
                           "a coherence check and a risk and blast-radius report.",
                 commands: [
-                    "**/ase-meta-diff** --coherence --risk --blast"
+                    "**/ase-repo-diff** --coherence --risk --blast"
                 ]
             },
             {
@@ -881,7 +881,7 @@ export const useCases: UseCase[] = [
                 body:     "A change set which grew into an epic is decomposed domain-wise into " +
                           "cohesive, separately committable parts.",
                 commands: [
-                    "**/ase-code-dissect** --max-parts 3 split by CLI, service, and docs"
+                    "**/ase-repo-dissect** --max-parts 3 split by CLI, service, and docs"
                 ]
             },
             {
@@ -891,7 +891,7 @@ export const useCases: UseCase[] = [
                 body:     "Before anyone else sees the branch, the staged diff gets a human-reviewer " +
                           "style critique with an approve or reject verdict.",
                 commands: [
-                    "**/ase-meta-review** --severity=MEDIUM"
+                    "**/ase-repo-review** --severity=MEDIUM"
                 ]
             },
             {
@@ -903,7 +903,7 @@ export const useCases: UseCase[] = [
                 commands: [
                     "**/ase-code-edit** --mode resolve --grill --verify " +
                     "the JSON output omits tasks without a title",
-                    "**/ase-meta-review** --severity=MEDIUM"
+                    "**/ase-repo-review** --severity=MEDIUM"
                 ]
             },
             {
@@ -914,7 +914,7 @@ export const useCases: UseCase[] = [
                           "change set, and the documentation is reconciled against the code that just " +
                           "changed — so no paperwork debt is carried into tomorrow.",
                 commands: [
-                    "**/ase-meta-changelog**",
+                    "**/ase-repo-changelog**",
                     "**/ase-sync-reconcile** --source code --target docs the --json output mode"
                 ]
             },
@@ -925,7 +925,7 @@ export const useCases: UseCase[] = [
                 body:     "The commit message is determined from the staged changes themselves, in " +
                           "the conventional form the project already uses.",
                 commands: [
-                    "**/ase-meta-commit**"
+                    "**/ase-repo-commit**"
                 ]
             }
         ]

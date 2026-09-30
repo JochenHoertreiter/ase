@@ -48,11 +48,13 @@ export const skillGroups: SkillGroup[] = [
             "ase-docs-refine",
             "ase-docs-proofread",
             "ase-docs-distill",
-            "ase-meta-review",
-            "ase-meta-diff",
-            "ase-meta-changelog",
-            "ase-meta-commit",
-            "ase-code-dissect"
+            "ase-repo-review",
+            "ase-repo-diff",
+            "ase-repo-changelog",
+            "ase-repo-commit",
+            "ase-repo-dissect",
+            "ase-repo-merge",
+            "ase-repo-resolve"
         ]
     },
     {

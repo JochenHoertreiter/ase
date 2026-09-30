@@ -1,16 +1,16 @@
 
 ##  NAME
 
-`ase-meta-commit` - Git Commit Message
+`ase-repo-commit` - Git Commit Message
 
 ##  SYNOPSIS
 
-`ase-meta-commit`
+`ase-repo-commit`
     [`--help`|`-h`]
 
 ##  DESCRIPTION
 
-The `ase-meta-commit` skill helps to *craft* a *concise commit
+The `ase-repo-commit` skill helps to *craft* a *concise commit
 message* for the currently staged Git changes. It inspects the
 output of `git diff --cached` and produces a single-line message of
 the form `<type>: <summary>` where *type* is one of `FEATURE`,
@@ -29,9 +29,9 @@ trailing period or Markdown formatting.
 Craft a commit message for the currently staged changes:
 
 ```text
-❯ /ase-meta-commit
+❯ /ase-repo-commit
 ```
 
 ##  SEE ALSO
 
-[`ase-meta-changelog`](../ase-meta-changelog/help.md).
+[`ase-repo-changelog`](../ase-repo-changelog/help.md).
