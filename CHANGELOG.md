@@ -2,7 +2,7 @@
 ChangeLog
 =========
 
-2.0.6 (2026-10-25)
+2.0.6 (2026-10-26)
 ------------------
 
 -   FEATURE [code]: Sortable Decision Matrix
@@ -32,6 +32,13 @@ ChangeLog
     The plugin now ships a square `plugin/.claude-plugin/icon.png` (1024x1024), rendered from the
     new `docs/ase-icon.svg` (the ASE logo centered on a white square), so the newer Claude Code
     `claude plugin validate` no longer warns about the missing icon (`ICON_MISSING`).
+
+-   IMPROVEMENT [docs]: Per-Feature Agent Tool Support Matrix on Compat Page
+    The compatibility section of the GitHub Pages site (`pages/src/components/Section-Compat.astro`)
+    now carries a detail table with the effective support score (-2 to +2) of each ASE feature
+    (plugin installation, hooks, skills, sub-agents, output style, statusline, mod API, MCP
+    service, telemetry, and headless agents) on each of the nine surfaces (CLI, IDE, and App) of
+    Anthropic Claude Code, GitHub Copilot, and OpenAI Codex, plus the per-surface score sums.
 
 2.0.5 (2026-10-24)
 ------------------
