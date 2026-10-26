@@ -7,7 +7,8 @@
 
 /*  "Compatibility" section: the known Agent-Harness and LLM compatibility
     matrices for ASE, rendered as two framed tables (mirroring the diagram
-    frame), plus a footnote and two explanatory NOTICE callouts.  */
+    frame), plus a footnote, two explanatory NOTICE callouts, and a detail
+    table of the per-feature support of the agent tool surfaces.  */
 
 import Annotation from "./Widget-Annotation.astro"
 
@@ -28,6 +29,71 @@ const llms = [
     { name: "OpenAI GPT",                version: "6",     compat: "95%",  goal: "none",      primary: false, mark: ""  },
     { name: "Gemini Flash",              version: "3.8",   compat: "70%",  goal: "none",      primary: false, mark: ""  }
 ]
+
+/*  the detailed agent tool compatibility matrix: per ASE feature, the effective
+    support score (-2 to +2) on each of the nine agent tool surfaces (in the order
+    of "toolGroups" times "toolSurfaces"), where a trailing "?" marks a score not
+    verifiable against official documentation and "n/a" an inapplicable feature  */
+const toolGroups   = [ "Anthropic Claude Code", "GitHub Copilot", "OpenAI Codex" ]
+const toolSurfaces = [ "CLI", "IDE", "App" ]
+const details = [
+    { feature: "Plugin Installation (<code>ase setup</code>)",                        scores: [ "+2", "+2",  "+1",  "+1", "0?",  "0?",  "+1", "-2",  "+1?" ] },
+    { feature: "Installation Scopes &amp; Status",                                    scores: [ "+2", "+2",  "+1",  "-1", "-1?", "-1?", "-1", "-2",  "-1?" ] },
+    { feature: "Session-Start Hook (Constitution, Persona)",                          scores: [ "+2", "+2",  "+2",  "+1", "0?",  "0?",  "+2", "-2",  "+1?" ] },
+    { feature: "Startup Banner (<code>systemMessage</code>)",                         scores: [ "+2", "+1?", "+1?", "0",  "0?",  "0?",  "+2", "-2",  "+1?" ] },
+    { feature: "Pre-Tool-Use/Permission-Request Hook (Auto-Approval)",                scores: [ "+2", "+2",  "+2",  "+1", "0?",  "0?",  "+1", "-2",  "+1?" ] },
+    { feature: "User-Prompt-Submit/Stop Hook (Activity Marker)",                      scores: [ "+2", "0",   "0",   "+2", "0?",  "0?",  "+2", "-2",  "0?"  ] },
+    { feature: "Session-End Hook (Cleanup)",                                          scores: [ "+2", "+2",  "+2",  "+2", "+1?", "+1?", "+2", "-2",  "+1?" ] },
+    { feature: "Skill Invocation &amp; Argument Hints",                               scores: [ "+2", "+2",  "+2",  "+2", "+1?", "+1?", "+1", "-1",  "+1?" ] },
+    { feature: "Skill Preprocessing (<code>@</code> Includes, <code>!`cmd`</code>)",  scores: [ "+2", "+2",  "+2",  "0",  "0?",  "0?",  "0",  "-2",  "0?"  ] },
+    { feature: "Skill Frontmatter (<code>effort</code>, <code>allowed-tools</code>)", scores: [ "+2", "+2",  "+2",  "+1", "0?",  "0?",  "-1", "-2",  "-1?" ] },
+    { feature: "Sub-Agents",                                                          scores: [ "+2", "+2",  "+1?", "+1", "+1?", "+1?", "0",  "-2",  "0?"  ] },
+    { feature: "User Dialog Tool",                                                    scores: [ "+2", "+2",  "+2",  "+1", "0?",  "0?",  "-1", "-2",  "-1?" ] },
+    { feature: "Output Style (<code>ase-terse</code>)",                               scores: [ "+2", "+1",  "0",   "0",  "0?",  "0?",  "0",  "-2",  "0?"  ] },
+    { feature: "Statusline (<code>ase statusline</code>)",                            scores: [ "+2", "-2",  "-2",  "+1", "-2?", "-2?", "-2", "-2",  "-2?" ] },
+    { feature: "Mod API (UI Rendering of Tables and Help Bands)",                     scores: [ "+2", "-1",  "-1",  "-2", "-2",  "-2",  "-2", "-2",  "-2"  ] },
+    { feature: "MCP Service (<code>ase mcp</code>)",                                  scores: [ "+2", "+2",  "+2",  "+2", "+1?", "+1?", "+2", "-1",  "+1?" ] },
+    { feature: "AI Usage Telemetry (OTLP)",                                           scores: [ "+2", "+1?", "+1?", "0",  "0?",  "-1?", "+1", "0?",  "+1?" ] },
+    { feature: "Headless Agents (<code>ase agent</code>)",                            scores: [ "+2", "n/a", "n/a", "+1", "n/a", "n/a", "+1", "n/a", "n/a" ] }
+]
+
+/*  the per-surface sums of the scores (where "n/a" counts as zero)  */
+const sums = details[0].scores.map((_s, k) =>
+    details.reduce((acc, d) => acc + (Number.parseInt(d.scores[k], 10) || 0), 0))
+
+/*  render a score with a typographic minus sign  */
+const fmtScore = (score: string): string =>
+    score.replace(/\?$/, "").replace(/^-/, "−")
+const fmtSum = (sum: number): string =>
+    sum > 0 ? `+${sum}` : sum < 0 ? `−${-sum}` : "0"
+
+/*  the outline of the focused CLI columns (the first surface of each tool group)
+    at its "top", "middle", or "bottom" cell of column <k>, thicker for the
+    primary Anthropic Claude Code than for the secondary agent tools  */
+const cliEdges = {
+    primary:   { top: "border-x-2 border-t-2", middle: "border-x-2", bottom: "border-x-2 border-b-2" },
+    secondary: { top: "border-x border-t",     middle: "border-x",   bottom: "border-x border-b"     }
+}
+const cliEdge = (k: number, edge: "top" | "middle" | "bottom"): string =>
+    k % 3 !== 0 ? "" :
+    `${cliEdges[k === 0 ? "primary" : "secondary"][edge]} border-x-brand-400 border-t-brand-400 border-b-brand-400 `
+
+/*  the heatmap styling of a score cell (in brand tones only)  */
+const scoreClass = (score: string): string => {
+    const n = Number.parseInt(score, 10)
+    if (Number.isNaN(n))
+        return "italic text-foreground-muted opacity-60"
+    else if (n >= 2)
+        return "bg-accent/25 font-bold text-accent"
+    else if (n === 1)
+        return "bg-accent/10 font-semibold text-accent"
+    else if (n === 0)
+        return "text-foreground-secondary"
+    else if (n === -1)
+        return "text-foreground-muted"
+    else
+        return "text-foreground-muted opacity-50"
+}
 ---
 <section id="compat" class="mt-4 sm:mt-12 relative isolate mx-auto max-w-4xl px-6 py-8">
     <header class="ase-section-head" data-reveal>
@@ -150,4 +216,76 @@ const llms = [
             </blockquote>
         </div>
     </div>
+
+    <header id="compat-detail" class="mt-24 ase-section-head" data-reveal>
+        <h3 class="ase-h3">
+            Agent Tool <span class="relative inline-block text-accent">
+                <Annotation flat class="left-1/2 -translate-x-1/4">
+                    You don't like<br/>
+                    Claude Code CLI?<br/>
+                    Rethink about this!
+                </Annotation>
+                Feature Support
+            </span>
+        </h3>
+        <p class="ase-lead ase-justify">
+            In detail, the distinguishing features of <b>ASE</b> are supported
+            differently by the CLI, IDE, and App surfaces of the agent tools.
+            Each cell rates the effective support of the feature on the
+            surface, i.e., the capability of the agent tool combined with the
+            current integration of <b>ASE</b>, from <b>&minus;2</b> (worse),{" "}
+            <b>&minus;1</b> (bad), and <b>0</b> (neutral) to <b>+1</b> (good)
+            and <b>+2</b> (very good). Do yourself a favor and use <b>ASE</b>{" "}
+            in Claude Code CLI!
+        </p>
+    </header>
+
+    <div class="bg-background-elevated/60 mt-6 overflow-x-auto rounded-xl border border-border-strong p-2 shadow-xl sm:p-3" data-reveal>
+        <table class="w-full min-w-[40rem] text-left text-xs sm:text-sm">
+            <colgroup>
+                <col class="w-[37%]" />
+                {details[0].scores.map(() => <col class="w-[7%]" />)}
+            </colgroup>
+            <thead>
+                <tr class="text-foreground">
+                    <th rowspan="2" class="pb-2 pr-2 align-bottom font-semibold">ASE Feature</th>
+                    {toolGroups.map((group) => (
+                        <th colspan="3" class="border-l border-border px-1 pb-1 text-center font-semibold">{group}</th>
+                    ))}
+                </tr>
+                <tr class="border-b border-border text-foreground-secondary">
+                    {toolGroups.map((_group, i) => toolSurfaces.map((surface, j) => (
+                        <th class={`px-1 pb-2 text-center font-semibold ${cliEdge(i * 3 + j, "top")}`}>{surface}</th>
+                    )))}
+                </tr>
+            </thead>
+            <tbody>
+                {details.map((d) => (
+                    <tr class="border-b border-border/40">
+                        <td class="py-1 pr-2 align-middle text-foreground-secondary" set:html={d.feature} />
+                        {d.scores.map((score, k) => (
+                            <td class={`px-1 py-1 text-center align-middle tabular-nums ${cliEdge(k, "middle")}${scoreClass(score)}`}>
+                                {fmtScore(score)}{score.endsWith("?") && <sup class="font-normal text-foreground-muted">?</sup>}
+                            </td>
+                        ))}
+                    </tr>
+                ))}
+            </tbody>
+            <tfoot>
+                <tr class="border-t border-border-strong">
+                    <td class="py-1.5 pr-2 font-bold text-foreground">Sum</td>
+                    {sums.map((sum, k) => (
+                        <td class={`px-1 py-1.5 text-center font-bold tabular-nums ${cliEdge(k, "bottom")}${sum > 0 ? "text-accent" : "text-foreground-muted"}`}>{fmtSum(sum)}</td>
+                    ))}
+                </tr>
+            </tfoot>
+        </table>
+    </div>
+
+    <p class="mt-4 text-center text-xs text-foreground-muted" data-reveal>
+        <span class="text-accent">?</span> not verifiable against the official documentation of the agent tool surface,{" "}
+        <span class="text-accent">n/a</span> not applicable to the agent tool surface.<br/>
+        The tool-independent parts of <b>ASE</b> (service, task board, specification, worktrees)
+        behave identically on all surfaces loading the plugin and hence are not listed.
+    </p>
 </section>
