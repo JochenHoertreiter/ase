@@ -12,9 +12,10 @@
     where typed text edits the filter, LEFT/RIGHT (or the wheel over the
     skills) selects a skill, UP/DOWN (or the wheel over the manual page)
     scroll its manual page (with the matches of the filter marked), RETURN
-    takes over its command into the prompt, "!!" switches over to the
-    intent help for the filter, and "//" leaves the filter in the prompt
-    (which mirrors the filter while the browser is shown).  */
+    takes over its command into the prompt, SPACE takes it over into the
+    synopsis form, "!!" switches over to the intent help for the filter,
+    and "//" leaves the filter in the prompt (which mirrors the filter while
+    the browser is shown).  */
 
 import type { Elements, Frozen, PromptBox, PromptEditInput, RenderElement } from "claude-code"
 import { type Engine, type Char, type BandRender, type BandScroll, type View, PICKED,
@@ -228,24 +229,26 @@ export const modHelpBrowse = () => {
     const hold = (current: Browse): PromptBox => held(current.filter.trimEnd())
 
     /*  take over the command of the selected manual page into the prompt (closing
-        the browser), if any page matches, and determine the prompt to show  */
-    const take = (current: Browse): PromptBox => {
+        the browser), if any page matches, optionally suffixed with a trigger (to
+        switch over to its band), and determine the prompt to show  */
+    const take = (current: Browse, trigger = ""): PromptBox => {
         const doc = matching(current)[current.select]?.doc
         if (doc === undefined)
             return hold(current)
         reset()
-        const text = `/${doc.skill} `
+        const text = `/${doc.skill} ${trigger}`
         return { text, cursor: text.length }
     }
 
     /*  while the manpage browser is shown, every edit is a key of the browser:
         LEFT/RIGHT select a manual page, UP/DOWN scroll it by a line, RETURN takes
-        over the command of the selected page, "//" (two "/" in a row) closes the
-        browser and leaves the filter in the prompt, "!!" (two "!"
-        in a row, for a non-empty filter) closes the browser with the filter suffixed
-        with the trigger of the intent help (to switch over to it), a deletion (like
-        BACKSPACE) deletes the last character of the filter, and any other typed
-        text is appended to the filter  */
+        over the command of the selected page, SPACE takes it over suffixed with
+        the trigger of the synopsis form, "//" (two "/" in a row) closes the
+        browser and leaves the filter in the prompt, "!!" (two "!" in a row, for
+        a non-empty filter) closes the browser with the filter suffixed with the
+        trigger of the intent help (both to switch over to the other band), a
+        deletion (like BACKSPACE) deletes the last character of the filter, and
+        any other typed text is appended to the filter  */
     const edit = (e: Frozen<PromptEditInput>): PromptBox => {
         const current   = browse!
         const key       = decode(e)
@@ -272,6 +275,8 @@ export const modHelpBrowse = () => {
         current.filter += pending
         if (key.name === "return")
             return take(current)
+        if (key.text === " ")
+            return take(current, "!!")
         if (key.name === "up" || key.name === "down")
             current.scroll = Math.max(0, current.scroll + (key.name === "up" ? -1 : 1))
         else if (key.step !== 0) {
@@ -393,7 +398,7 @@ export const modHelpBrowse = () => {
             status: `[ ${list.length}/${docs?.length ?? 0} manpages ]`,
             hints:  `←/→${wheeled}: select · ` +
                 `${geometry.overflow ? "wheel or CTRL+x + TAB + ↑/↓/PgUp/PgDn" : "↑/↓"}: scroll · ` +
-                "//: cancel+close · ⏎: apply+close" +
+                "//: cancel+close · ⏎: apply+close · SPACE: compose" +
                 (current.filter.trim() !== "" ? " · !!: Find Skill Command" : "") + " · (type for filtering)",
             rows:   (i) => i === 0 ? field : entry(current.top + i - 2),
             rule:   (i) => i === 1,

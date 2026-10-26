@@ -10,9 +10,10 @@
     the skill "ase-help-intent", but over the session context), and showing
     the proposed skills in a master/detail view in the band above the
     prompt, where LEFT/RIGHT (or the wheel over the skills) selects a skill,
-    UP/DOWN and "b"/"f"/SPACE (or the wheel over the details) scroll its
-    details, RETURN picks its command into the prompt, and "!!", BACKSPACE, or
-    any other key restores the prompt as typed without the trigger.  */
+    UP/DOWN and "b"/"f" (or the wheel over the details) scroll its details,
+    RETURN picks its command into the prompt, SPACE picks it into the synopsis
+    form, and "!!", BACKSPACE, or any other key restores the prompt as typed
+    without the trigger.  */
 
 import type { Elements, Frozen, PromptBox, PromptEditInput, RenderElement } from "claude-code"
 import { type Engine, type Char, type BandRender, type BandScroll, type View, PICKED, CODE,
@@ -198,11 +199,13 @@ export const modHelpFind = () => {
 
     /*  while the intent band is shown, every edit is a key of the band (with the
         prompt held): LEFT/RIGHT select a proposal, UP/DOWN scroll its details by
-        a line and "b"/"f"/SPACE by a page (as the engine consumes PAGEUP/PAGEDOWN),
+        a line and "b"/"f" by a page (as the engine consumes PAGEUP/PAGEDOWN),
         RETURN (arriving as a typed newline in the held prompt) operates the band
-        as at the prompt, "//" (two "/" in a row) closes the band with the prompt
-        as typed suffixed with the trigger of the manpage browser (to switch over
-        to it), and "!!" (two "!" in a row), a deletion (like BACKSPACE), or any
+        as at the prompt, SPACE closes the band with the command of the selected
+        proposal suffixed with the trigger of the synopsis form, "//" (two "/"
+        in a row) closes the band with the prompt as typed suffixed with the
+        trigger of the manpage browser (both to switch over to the other band),
+        and "!!" (two "!" in a row), a deletion (like BACKSPACE), or any
         other key closes the band and restores the prompt as typed without the
         trigger (onto whose end the edit of a typed text is still to be applied)  */
     const edit = (e: Frozen<PromptEditInput>): PromptBox | string => {
@@ -222,8 +225,13 @@ export const modHelpFind = () => {
             const text = submit()
             return intent !== undefined ? held(draft) : { text, cursor: text.length }
         }
+        if (state === "done" && key.text === " ") {
+            reset()
+            const text = `${proposals[current.select]!.command} !!`
+            return { text, cursor: text.length }
+        }
         const roll = key.name === "up" ? -1 : key.name === "down" ? 1 :
-            key.text === "b" ? -current.page : key.text === "f" || key.text === " " ? current.page : 0
+            key.text === "b" ? -current.page : key.text === "f" ? current.page : 0
         const step = roll !== 0 ? 0 : key.step
         if (state === "done" && (roll !== 0 || step !== 0)) {
             if (step !== 0) {
@@ -406,7 +414,7 @@ export const modHelpFind = () => {
             (the intent itself stays visible in the prompt)  */
         return panel(ui, geometry, current, {
             title: TITLE,
-            hints: current.state === "done" ? "⌫/!!: cancel+close · ⏎: apply+close · ←/→: select · b/f/SPACE: scroll" +
+            hints: current.state === "done" ? "⌫/!!: cancel+close · ⏎: apply+close · SPACE: compose · ←/→: select · b/f: scroll" +
                 (geometry.overflow ? " · wheel: select/scroll" : "") + " · //: Browse Skill Manpages" :
                 "⌫/!!/any key: cancel+close · //: Browse Skill Manpages",
             rows:  (i) => {

@@ -14,6 +14,14 @@ ChangeLog
     parsing is now shared with the grilling table via `ase-mods-common.ts`.
     Needs `CLAUDE_CODE_ENABLE_FUNCTION_HOOKS=1`.
 
+-   IMPROVEMENT [code]: SPACE Switches from Find and Browse to Compose
+    In the intent help ("Find Skill Command") and the manpage browser ("Browse Skill Manpages")
+    of the Claude Code function hooks module, SPACE now takes over the command of the selected
+    skill into the prompt and immediately switches over to the synopsis form ("Compose Skill
+    Command"), as if RETURN and then `!!` were pressed. Hence, SPACE no longer scrolls the details
+    of the intent help (`b`/`f` still do), and no longer extends the filter of the manpage browser
+    (multi-keyword filters can still be given by the free text before the `//` trigger).
+
 -   IMPROVEMENT [code, docs]: Function Hooks Enabled by `ase setup`
     For `--tool claude`, `ase setup install` and `ase setup update` now enable the function hooks
     of the plugin-shipped mods by writing `"CLAUDE_CODE_ENABLE_FUNCTION_HOOKS": "1"` into the `env`
