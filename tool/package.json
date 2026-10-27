@@ -143,6 +143,7 @@
         "!plugin/node_modules/**",
         "!plugin/package.json",
         "!plugin/etc/**",
+        "!plugin/mods/claude-code.d.ts",
         ".claude-plugin/**/*",
         "README.md"
     ],
