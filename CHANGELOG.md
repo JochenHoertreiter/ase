@@ -40,6 +40,13 @@ ChangeLog
     service, telemetry, and headless agents) on each of the nine surfaces (CLI, IDE, and App) of
     Anthropic Claude Code, GitHub Copilot, and OpenAI Codex, plus the per-surface score sums.
 
+-   IMPROVEMENT [infr]: Faster Plugin Mirroring in `tool` Build
+    The `build-plugin` target of `tool/etc/stx.conf` now mirrors `plugin/` and `.claude-plugin/`
+    via `syncdir` of the new development dependency `sync-directory`, which excludes
+    `node_modules`, `package.json`, `etc/`, and `.gitignore` already during the traversal and
+    deletes orphaned target files, instead of copying everything (including the 465 MB of
+    `plugin/node_modules`) and then removing the excluded parts again (7.9s down to 0.6s).
+
 2.0.5 (2026-10-24)
 ------------------
 
